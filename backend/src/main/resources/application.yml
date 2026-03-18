@@ -1,0 +1,24 @@
+spring:
+  application:
+    name: calorie-counter
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/calorie_counter
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+server:
+  port: 8080
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:my-super-secret-key-for-development-only-change-in-production}
+    expiration-ms: 86400000
