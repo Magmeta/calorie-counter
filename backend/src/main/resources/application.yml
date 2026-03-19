@@ -15,10 +15,32 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
 server:
   port: 8080
+
+logging:
+  level:
+    com.caloriecounter.security: DEBUG
 
 app:
   jwt:
     secret: ${JWT_SECRET:my-super-secret-key-for-development-only-change-in-production}
     expiration-ms: 86400000
+  ai:
+    provider: ${AI_PROVIDER:gemini}
+    claude:
+      api-key: ${CLAUDE_API_KEY:}
+      model: claude-sonnet-4-6-20250514
+    openai:
+      api-key: ${OPENAI_API_KEY:}
+      model: gpt-4o
+    gemini:
+      api-key: ${GEMINI_API_KEY:}
+      model: gemini-2.5-flash
+  usda:
+    api-key: ${USDA_API_KEY:DEMO_KEY}

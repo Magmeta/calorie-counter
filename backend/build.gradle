@@ -38,6 +38,12 @@ dependencies {
     runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
     runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
 
+    // Dotenv (.env файл)
+    implementation 'me.paulschwarz:spring-dotenv:4.0.0'
+
+    // Spring WebFlux (WebClient для запросов к AI API)
+    implementation 'org.springframework.boot:spring-boot-starter-webflux'
+
     // Lombok
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'

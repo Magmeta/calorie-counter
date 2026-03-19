@@ -5,6 +5,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -13,8 +14,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.List;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class JwtAuthFilter extends OncePerRequestFilter {
@@ -31,17 +32,27 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
         if (header != null && header.startsWith("Bearer ")) {
             String token = header.substring(7);
+            log.debug("JWT token found, validating...");
 
-            if (jwtUtils.validateToken(token)) {
-                String username = jwtUtils.getUsernameFromToken(token);
-                var userDetails = userDetailsService.loadUserByUsername(username);
+            try {
+                if (jwtUtils.validateToken(token)) {
+                    String username = jwtUtils.getUsernameFromToken(token);
+                    log.debug("JWT valid for user: {}", username);
+                    var userDetails = userDetailsService.loadUserByUsername(username);
 
-                var auth = new UsernamePasswordAuthenticationToken(
-                        userDetails, null, userDetails.getAuthorities());
-                auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    var auth = new UsernamePasswordAuthenticationToken(
+                            userDetails, null, userDetails.getAuthorities());
+                    auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
-                SecurityContextHolder.getContext().setAuthentication(auth);
+                    SecurityContextHolder.getContext().setAuthentication(auth);
+                } else {
+                    log.warn("JWT validation failed");
+                }
+            } catch (Exception e) {
+                log.error("JWT processing error: {}", e.getMessage());
             }
+        } else {
+            log.debug("No JWT token in request to: {}", request.getRequestURI());
         }
 
         filterChain.doFilter(request, response);

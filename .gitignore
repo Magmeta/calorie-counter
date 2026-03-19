@@ -2,6 +2,10 @@
 .idea/
 *.iml
 
+# Claude Code
+.claude/settings.local.json
+.claude/mcp.json
+
 # Backend
 backend/build/
 backend/.gradle/
@@ -15,6 +19,9 @@ frontend/out/
 .env
 .env.local
 .env.production
+
+# Logs
+backend/backend.log
 
 # OS
 .DS_Store
