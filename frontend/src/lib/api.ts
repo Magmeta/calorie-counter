@@ -15,11 +15,51 @@ export async function apiRequest(endpoint: string, options: RequestInit = {}) {
   });
 
   if (!response.ok) {
-    const error = await response.text();
-    throw new Error(error || "Ошибка запроса");
+    let errorMessage = "Ошибка запроса";
+    const text = await response.text();
+    try {
+      const errorData = JSON.parse(text);
+      errorMessage = errorData.error || errorData.message || errorMessage;
+    } catch {
+      if (text) errorMessage = text;
+    }
+    throw new Error(errorMessage);
   }
 
   return response.json();
+}
+
+// Привычки
+export async function getHabits() {
+  return apiRequest("/api/habits");
+}
+
+export async function addHabit(text: string) {
+  return apiRequest("/api/habits", {
+    method: "POST",
+    body: JSON.stringify({ text }),
+  });
+}
+
+export async function deleteHabit(id: number) {
+  return apiRequest(`/api/habits/${id}`, { method: "DELETE" });
+}
+
+// Вода
+export async function addWater(amount: number) {
+  return apiRequest("/api/water", {
+    method: "POST",
+    body: JSON.stringify({ amount }),
+  });
+}
+
+export async function getDailyWater(date?: string) {
+  const param = date ? `?date=${date}` : "";
+  return apiRequest(`/api/water/daily${param}`);
+}
+
+export async function deleteWater(id: number) {
+  return apiRequest(`/api/water/${id}`, { method: "DELETE" });
 }
 
 export async function login(username: string, password: string) {

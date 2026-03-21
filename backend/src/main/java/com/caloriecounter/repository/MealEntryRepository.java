@@ -14,4 +14,6 @@ public interface MealEntryRepository extends JpaRepository<MealEntry, Long> {
             Long userId, LocalDate startDate, LocalDate endDate);
 
     void deleteByIdAndUserId(Long id, Long userId);
+
+    List<MealEntry> findByUserIdAndMealDateAndFoodNameContainingIgnoreCase(Long userId, LocalDate date, String foodName);
 }

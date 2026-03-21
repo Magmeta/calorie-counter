@@ -17,8 +17,12 @@ public class AuthController {
     private final AuthService authService;
 
     @PostMapping("/register")
-    public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
-        return ResponseEntity.ok(authService.register(request));
+    public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest request) {
+        try {
+            return ResponseEntity.ok(authService.register(request));
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(409).body(java.util.Map.of("error", e.getMessage()));
+        }
     }
 
     @PostMapping("/login")

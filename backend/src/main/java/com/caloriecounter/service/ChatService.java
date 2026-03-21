@@ -9,6 +9,7 @@ import com.caloriecounter.entity.Message.ChatMode;
 import com.caloriecounter.entity.Message.Role;
 import com.caloriecounter.entity.User;
 import com.caloriecounter.entity.UserProfile;
+import com.caloriecounter.entity.UserHabit;
 import com.caloriecounter.repository.MealEntryRepository;
 import com.caloriecounter.repository.MessageRepository;
 import com.caloriecounter.repository.UserProfileRepository;
@@ -38,6 +39,7 @@ public class ChatService {
     private final MessageRepository messageRepository;
     private final UserRepository userRepository;
     private final UserProfileRepository userProfileRepository;
+    private final UserHabitService userHabitService;
     private final ObjectMapper objectMapper;
 
     public ChatResponse sendMessage(String username, ChatRequest request) {
@@ -74,8 +76,11 @@ public class ChatService {
 
         // В режиме дневника парсим и сохраняем в таблицу
         String displayReply = aiReply;
+        String notification = null;
         if (chatMode == ChatMode.DIARY) {
-            displayReply = parseMealDataAndSave(aiReply, user);
+            ParseResult result = parseMealDataAndSave(aiReply, user);
+            displayReply = result.displayText;
+            notification = result.notification;
         }
 
         // Сохраняем ответ ИИ (без JSON-блока)
@@ -86,7 +91,7 @@ public class ChatService {
         assistantMessage.setChatMode(chatMode);
         messageRepository.save(assistantMessage);
 
-        return new ChatResponse(displayReply, chatMode.name());
+        return new ChatResponse(displayReply, chatMode.name(), notification);
     }
 
     public ChatResponse sendMessageWithPhoto(String username, String message, String chatModeStr,
@@ -115,8 +120,11 @@ public class ChatService {
 
         // В режиме дневника парсим и сохраняем в таблицу
         String displayReply = aiReply;
+        String notification = null;
         if (chatMode == ChatMode.DIARY) {
-            displayReply = parseMealDataAndSave(aiReply, user);
+            ParseResult result = parseMealDataAndSave(aiReply, user);
+            displayReply = result.displayText;
+            notification = result.notification;
         }
 
         // Сохраняем ответ ИИ (без JSON-блока)
@@ -127,7 +135,7 @@ public class ChatService {
         assistantMessage.setChatMode(chatMode);
         messageRepository.save(assistantMessage);
 
-        return new ChatResponse(displayReply, chatMode.name());
+        return new ChatResponse(displayReply, chatMode.name(), notification);
     }
 
     public List<MessageResponse> getHistory(String username) {
@@ -175,12 +183,22 @@ public class ChatService {
             }
         }
 
+        // Привычки пользователя
+        String habitsText = userHabitService.getHabitsForPrompt(userId);
+        if (habitsText != null) {
+            prompt.append("\n## Привычки пользователя\n");
+            prompt.append("Учитывай эти привычки при подсчёте калорий:\n");
+            prompt.append(habitsText);
+            prompt.append("Если пользователь говорит продукт из привычки — автоматически учитывай добавки.\n");
+        }
+
         if (chatMode == ChatMode.DIARY) {
             prompt.append("""
 
                     ## Режим: ДНЕВНИК
-                    Пользователь записывает что он ел. Твоя задача:
+                    Пользователь записывает что он ел или просит изменить/удалить записи. Твоя задача:
 
+                    ### Если пользователь сообщает о еде:
                     1. Определи все продукты/блюда из сообщения пользователя.
                     2. Для каждого продукта укажи:
                        - Название
@@ -202,8 +220,34 @@ public class ChatService {
                     ```json
                     [{"name":"Название продукта","weight":вес_в_граммах,"calories":ккал,"protein":белки,"fat":жиры,"carbs":углеводы}]
                     ```
-                    Этот JSON-блок будет автоматически удалён из отображаемого ответа и использован для записи в таблицу питания.
-                    Числа в JSON должны быть числами (не строками). Всегда добавляй этот блок когда пользователь сообщает о еде.
+
+                    ### Если пользователь просит удалить запись:
+                    Примеры: "убери пиццу", "удали гречку из сегодня", "я не ел борщ"
+                    Ответь подтверждением удаления.
+                    В JSON-блоке используй формат удаления:
+                    ```json
+                    [{"action":"delete","name":"Пицца"}]
+                    ```
+
+                    ### Если пользователь просит изменить запись:
+                    Примеры: "замени пиццу на салат", "измени вес гречки на 200г"
+                    Ответь подтверждением изменения.
+                    Для замены используй удаление старого + добавление нового:
+                    ```json
+                    [{"action":"delete","name":"Пицца"},{"name":"Салат","weight":200,"calories":120,"protein":5,"fat":3,"carbs":15}]
+                    ```
+
+                    Этот JSON-блок будет автоматически удалён из отображаемого ответа и использован для записи/удаления в таблице питания.
+                    Числа в JSON должны быть числами (не строками). Всегда добавляй этот блок когда пользователь сообщает о еде или просит изменить/удалить записи.
+
+                    ### Привычки
+                    Если пользователь упоминает привычку (например "я всегда пью чай с сахаром", "обычно ем кашу с маслом", "мой кофе = латте"), добавь в JSON-блок:
+                    {"action":"add_habit","text":"описание привычки"}
+                    Пример: пользователь говорит "я всегда пью чай с двумя ложками сахара" → добавь запись еды И привычку:
+                    ```json
+                    [{"name":"Чай с сахаром","weight":250,"calories":40,"protein":0,"fat":0,"carbs":10},{"action":"add_habit","text":"Чай = чай + 2 ложки сахара (+20 ккал)"}]
+                    ```
+                    Не добавляй привычку если пользователь просто перечисляет еду без указания на привычку.
 
                     Будь кратким. Не добавляй лишних рассуждений.
                     """);
@@ -231,38 +275,92 @@ public class ChatService {
 
     private static final Pattern JSON_BLOCK_PATTERN = Pattern.compile("```json\\s*(\\[.*?])\\s*```", Pattern.DOTALL);
 
-    private String parseMealDataAndSave(String aiReply, User user) {
+    private record ParseResult(String displayText, String notification) {}
+
+    @org.springframework.transaction.annotation.Transactional
+    private ParseResult parseMealDataAndSave(String aiReply, User user) {
         Matcher matcher = JSON_BLOCK_PATTERN.matcher(aiReply);
         if (!matcher.find()) {
             log.debug("JSON-блок не найден в ответе ИИ");
-            return aiReply;
+            return new ParseResult(aiReply, null);
         }
 
         String jsonStr = matcher.group(1);
+        List<String> savedNames = new ArrayList<>();
+        List<String> deletedNames = new ArrayList<>();
+        List<String> habitNames = new ArrayList<>();
+        double totalCal = 0;
+
         try {
             List<Map<String, Object>> items = objectMapper.readValue(jsonStr, new TypeReference<>() {});
 
             for (Map<String, Object> item : items) {
-                MealEntry entry = new MealEntry();
-                entry.setUser(user);
-                entry.setFoodName((String) item.get("name"));
-                entry.setWeight(toDouble(item.get("weight")));
-                entry.setCalories(toDouble(item.get("calories")));
-                entry.setProtein(toDouble(item.get("protein")));
-                entry.setFat(toDouble(item.get("fat")));
-                entry.setCarbs(toDouble(item.get("carbs")));
-                entry.setMealDate(LocalDate.now());
-                mealEntryRepository.save(entry);
+                String action = (String) item.get("action");
+
+                if ("add_habit".equals(action)) {
+                    String habitText = (String) item.get("text");
+                    if (habitText != null && !habitText.isBlank()) {
+                        userHabitService.addHabitFromAi(user.getId(), habitText);
+                        habitNames.add(habitText);
+                    }
+                } else if ("delete".equals(action)) {
+                    // Удаление записи по имени за сегодня
+                    String foodName = (String) item.get("name");
+                    if (foodName != null) {
+                        List<MealEntry> found = mealEntryRepository
+                                .findByUserIdAndMealDateAndFoodNameContainingIgnoreCase(user.getId(), LocalDate.now(), foodName);
+                        if (!found.isEmpty()) {
+                            mealEntryRepository.delete(found.get(0));
+                            deletedNames.add(foodName);
+                            log.info("Удалена запись '{}' для {}", foodName, user.getUsername());
+                        } else {
+                            log.info("Запись '{}' не найдена для удаления у {}", foodName, user.getUsername());
+                        }
+                    }
+                } else {
+                    // Добавление записи
+                    MealEntry entry = new MealEntry();
+                    entry.setUser(user);
+                    entry.setFoodName((String) item.get("name"));
+                    entry.setWeight(toDouble(item.get("weight")));
+                    entry.setCalories(toDouble(item.get("calories")));
+                    entry.setProtein(toDouble(item.get("protein")));
+                    entry.setFat(toDouble(item.get("fat")));
+                    entry.setCarbs(toDouble(item.get("carbs")));
+                    entry.setMealDate(LocalDate.now());
+                    mealEntryRepository.save(entry);
+
+                    savedNames.add((String) item.get("name"));
+                    Double cal = toDouble(item.get("calories"));
+                    if (cal != null) totalCal += cal;
+                }
             }
 
-            log.info("Сохранено {} записей в таблицу питания для {}", items.size(), user.getUsername());
+            log.info("Обработано {} команд для {}", items.size(), user.getUsername());
         } catch (Exception e) {
             log.warn("Не удалось распарсить JSON из ответа ИИ: {}", e.getMessage());
-            return aiReply;
+            return new ParseResult(aiReply, null);
         }
 
+        // Формируем уведомление
+        List<String> notifications = new ArrayList<>();
+        if (!savedNames.isEmpty()) {
+            String foods = String.join(", ", savedNames);
+            notifications.add(String.format("Записано в таблицу: %s (%d ккал)", foods, Math.round(totalCal)));
+        }
+        if (!deletedNames.isEmpty()) {
+            String foods = String.join(", ", deletedNames);
+            notifications.add(String.format("Удалено из таблицы: %s", foods));
+        }
+        if (!habitNames.isEmpty()) {
+            String habits = String.join("; ", habitNames);
+            notifications.add(String.format("Запомнил привычку: %s", habits));
+        }
+        String notification = notifications.isEmpty() ? null : String.join("\n", notifications);
+
         // Убираем JSON-блок из отображаемого ответа
-        return matcher.replaceAll("").trim();
+        String displayText = matcher.replaceAll("").trim();
+        return new ParseResult(displayText, notification);
     }
 
     private Double toDouble(Object value) {

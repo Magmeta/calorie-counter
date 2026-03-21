@@ -16,4 +16,5 @@ public class DailySummaryResponse {
     private Double totalFat;
     private Double totalCarbs;
     private Double dailyNorm;
+    private String aiComment;
 }

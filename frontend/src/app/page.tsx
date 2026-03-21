@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { apiRequest, isAuthenticated, logout, sendPhoto } from "@/lib/api";
 import DailyTable from "@/components/DailyTable";
+import HabitsPanel from "@/components/HabitsPanel";
+import WaterModal from "@/components/WaterModal";
+import ReactMarkdown from "react-markdown";
 
 interface Message {
   id?: number;
@@ -12,6 +15,7 @@ interface Message {
   content: string;
   chatMode: string;
   imageUrl?: string;
+  notification?: string;
 }
 
 export default function Home() {
@@ -24,7 +28,10 @@ export default function Home() {
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [tableOpen, setTableOpen] = useState(false);
+  const [habitsOpen, setHabitsOpen] = useState(false);
+  const [waterModalOpen, setWaterModalOpen] = useState(false);
   const [tableRefresh, setTableRefresh] = useState(0);
+  const [habitsRefresh, setHabitsRefresh] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -95,6 +102,15 @@ export default function Home() {
         });
       }
 
+      // Уведомление о записи в таблицу
+      if (data.notification) {
+        setMessages((prev) => [...prev, {
+          role: "NOTIFICATION",
+          content: data.notification,
+          chatMode: data.chatMode,
+        }]);
+      }
+
       const aiMessage: Message = {
         role: "ASSISTANT",
         content: data.reply,
@@ -103,6 +119,9 @@ export default function Home() {
       setMessages((prev) => [...prev, aiMessage]);
       if (chatMode === "DIARY") {
         setTableRefresh((prev) => prev + 1);
+      }
+      if (data.notification && data.notification.includes("привычку")) {
+        setHabitsRefresh((prev) => prev + 1);
       }
     } catch {
       setMessages((prev) => [
@@ -128,6 +147,18 @@ export default function Home() {
           >
             Таблицы
           </button>
+          <button
+            onClick={() => setHabitsOpen(true)}
+            className="text-blue-600 hover:underline text-sm"
+          >
+            Привычки
+          </button>
+          <button
+            onClick={() => setWaterModalOpen(true)}
+            className="text-blue-600 hover:underline text-sm"
+          >
+            Вода
+          </button>
           <Link href="/profile" className="text-blue-600 hover:underline text-sm">
             Профиль
           </Link>
@@ -135,7 +166,7 @@ export default function Home() {
           <button
             onClick={() => {
               logout();
-              router.push("/login");
+              window.location.href = "/login";
             }}
             className="px-3 py-1 text-sm bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
           >
@@ -179,27 +210,49 @@ export default function Home() {
         )}
 
         {messages.map((msg, i) => (
-          <div
-            key={i}
-            className={`flex ${msg.role === "USER" ? "justify-end" : "justify-start"}`}
-          >
-            <div
-              className={`max-w-[75%] px-4 py-3 rounded-2xl text-sm whitespace-pre-wrap ${
-                msg.role === "USER"
-                  ? "bg-blue-600 text-white rounded-br-md"
-                  : "bg-white text-gray-800 border rounded-bl-md shadow-sm"
-              }`}
-            >
-              {msg.imageUrl && (
-                <img
-                  src={msg.imageUrl}
-                  alt="Фото еды"
-                  className="max-w-full rounded-lg mb-2 max-h-64 object-cover"
-                />
-              )}
-              {msg.content}
+          msg.role === "NOTIFICATION" ? (
+            <div key={i} className="flex justify-center">
+              <div className="px-4 py-2 rounded-full text-xs font-medium text-white"
+                   style={{ background: "linear-gradient(135deg, #179BB0, #15565B)" }}>
+                {msg.content}
+              </div>
             </div>
-          </div>
+          ) : (
+            <div
+              key={i}
+              className={`flex ${msg.role === "USER" ? "justify-end" : "justify-start"}`}
+            >
+              <div
+                className={`max-w-[75%] px-4 py-3 rounded-2xl text-sm whitespace-pre-wrap ${
+                  msg.role === "USER"
+                    ? "bg-blue-600 text-white rounded-br-md"
+                    : "bg-white text-gray-800 border rounded-bl-md shadow-sm"
+                }`}
+              >
+                {msg.imageUrl && (
+                  <img
+                    src={msg.imageUrl}
+                    alt="Фото еды"
+                    className="max-w-full rounded-lg mb-2 max-h-64 object-cover"
+                  />
+                )}
+                {msg.role === "USER" ? (
+                  msg.content
+                ) : (
+                  <ReactMarkdown
+                    components={{
+                      p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                      ul: ({ children }) => <ul className="list-disc ml-4 mb-2">{children}</ul>,
+                      ol: ({ children }) => <ol className="list-decimal ml-4 mb-2">{children}</ol>,
+                      strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                    }}
+                  >
+                    {msg.content}
+                  </ReactMarkdown>
+                )}
+              </div>
+            </div>
+          )
         ))}
 
         {loading && (
@@ -281,6 +334,12 @@ export default function Home() {
 
       {/* Боковая панель с таблицей */}
       <DailyTable isOpen={tableOpen} onClose={() => setTableOpen(false)} refreshTrigger={tableRefresh} />
+
+      {/* Панель привычек */}
+      <HabitsPanel isOpen={habitsOpen} onClose={() => setHabitsOpen(false)} refreshTrigger={habitsRefresh} />
+
+      {/* Модалка воды */}
+      <WaterModal isOpen={waterModalOpen} onClose={() => setWaterModalOpen(false)} />
     </div>
   );
 }

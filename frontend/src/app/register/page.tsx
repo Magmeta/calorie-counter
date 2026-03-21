@@ -22,7 +22,7 @@ export default function RegisterPage() {
       await register(username, email, password);
       router.push("/");
     } catch (err) {
-      setError("Ошибка регистрации. Возможно, имя или email уже заняты.");
+      setError(err instanceof Error ? err.message : "Ошибка регистрации");
     } finally {
       setLoading(false);
     }
