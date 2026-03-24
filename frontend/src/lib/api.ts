@@ -26,7 +26,13 @@ export async function apiRequest(endpoint: string, options: RequestInit = {}) {
     throw new Error(errorMessage);
   }
 
-  return response.json();
+  const responseText = await response.text();
+  if (!responseText) return null;
+  try {
+    return JSON.parse(responseText);
+  } catch {
+    return responseText;
+  }
 }
 
 // Привычки
@@ -85,6 +91,11 @@ export async function register(username: string, email: string, password: string
 export function logout() {
   localStorage.removeItem("token");
   localStorage.removeItem("username");
+}
+
+export async function getDailyMood(date?: string) {
+  const param = date ? `?date=${date}` : "";
+  return apiRequest(`/api/meals/mood${param}`);
 }
 
 export function isAuthenticated(): boolean {

@@ -11,6 +11,8 @@ import java.time.LocalDateTime;
 @Data
 public class MealEntry {
 
+    public enum EntryType { MEAL, WATER }
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -19,10 +21,14 @@ public class MealEntry {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private EntryType entryType = EntryType.MEAL;
+
     @Column(nullable = false)
     private String foodName;
 
-    private Double weight; // граммы
+    private Double weight; // граммы (для воды — миллилитры)
 
     @Column(nullable = false)
     private Double calories;
@@ -30,6 +36,8 @@ public class MealEntry {
     private Double protein;
     private Double fat;
     private Double carbs;
+
+    private String mood; // настроение за день (заполняется на первой записи дня)
 
     @Column(nullable = false)
     private LocalDate mealDate;
@@ -41,5 +49,6 @@ public class MealEntry {
     protected void onCreate() {
         if (createdAt == null) createdAt = LocalDateTime.now();
         if (mealDate == null) mealDate = LocalDate.now();
+        if (entryType == null) entryType = EntryType.MEAL;
     }
 }

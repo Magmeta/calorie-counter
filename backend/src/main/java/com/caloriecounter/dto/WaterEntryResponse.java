@@ -1,6 +1,6 @@
 package com.caloriecounter.dto;
 
-import com.caloriecounter.entity.WaterEntry;
+import com.caloriecounter.entity.MealEntry;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
@@ -15,11 +15,11 @@ public class WaterEntryResponse {
     private LocalDate entryDate;
     private LocalDateTime createdAt;
 
-    public static WaterEntryResponse from(WaterEntry entry) {
+    public static WaterEntryResponse from(MealEntry entry) {
         return new WaterEntryResponse(
                 entry.getId(),
-                entry.getAmount(),
-                entry.getEntryDate(),
+                entry.getWeight() != null ? entry.getWeight().intValue() : 0,
+                entry.getMealDate(),
                 entry.getCreatedAt()
         );
     }

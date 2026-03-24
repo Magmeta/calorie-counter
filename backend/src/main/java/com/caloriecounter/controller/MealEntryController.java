@@ -3,6 +3,8 @@ package com.caloriecounter.controller;
 import com.caloriecounter.dto.DailySummaryResponse;
 import com.caloriecounter.dto.MonthlySummaryResponse;
 import com.caloriecounter.dto.WeeklySummaryResponse;
+import com.caloriecounter.repository.MealEntryRepository;
+import com.caloriecounter.repository.UserRepository;
 import com.caloriecounter.service.MealEntryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -20,6 +22,8 @@ import java.util.List;
 public class MealEntryController {
 
     private final MealEntryService mealEntryService;
+    private final MealEntryRepository mealEntryRepository;
+    private final UserRepository userRepository;
 
     @GetMapping("/daily")
     public ResponseEntity<DailySummaryResponse> getDailySummary(
@@ -77,5 +81,17 @@ public class MealEntryController {
             @PathVariable Long id) {
         mealEntryService.deleteEntry(userDetails.getUsername(), id);
         return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/mood")
+    public ResponseEntity<?> getMood(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        if (date == null) date = LocalDate.now();
+        var user = userRepository.findByUsername(userDetails.getUsername())
+                .orElseThrow(() -> new RuntimeException("Пользователь не найден"));
+        var entry = mealEntryRepository.findFirstByUserIdAndMealDateAndMoodIsNotNull(user.getId(), date);
+        return ResponseEntity.ok(entry.map(e -> java.util.Map.of("mood", e.getMood(), "date", e.getMealDate().toString()))
+                .orElse(java.util.Map.of()));
     }
 }

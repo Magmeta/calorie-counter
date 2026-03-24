@@ -26,6 +26,8 @@ server:
 logging:
   level:
     com.caloriecounter.security: DEBUG
+  file:
+    name: logs/app.log
 
 app:
   jwt:

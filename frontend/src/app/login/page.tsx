@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { login } from "@/lib/api";
+import { LogIn } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -28,39 +29,39 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="w-full max-w-md p-8 bg-white rounded-2xl shadow-md">
-        <h1 className="text-2xl font-bold text-center mb-6">Вход</h1>
+    <div className="min-h-screen flex items-center justify-center px-4" style={{ position: "relative", zIndex: 1 }}>
+      <div className="glass w-full max-w-md p-8 animate-fade-in">
+        <h1 className="text-2xl font-bold text-center mb-6 text-white">Вход</h1>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg text-sm">
+          <div className="mb-4 p-3 rounded-xl text-sm text-red-400" style={{ background: "rgba(239,68,68,0.15)" }}>
             {error}
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium mb-1" style={{ color: "#86CDD9" }}>
               Имя пользователя
             </label>
             <input
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="input-dark"
               required
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium mb-1" style={{ color: "#86CDD9" }}>
               Пароль
             </label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="input-dark"
               required
             />
           </div>
@@ -68,15 +69,16 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            className="btn-primary w-full flex items-center justify-center gap-2 py-2.5"
           >
+            <LogIn size={18} />
             {loading ? "Вход..." : "Войти"}
           </button>
         </form>
 
-        <p className="mt-4 text-center text-sm text-gray-600">
+        <p className="mt-4 text-center text-sm" style={{ color: "#86CDD9" }}>
           Нет аккаунта?{" "}
-          <Link href="/register" className="text-blue-600 hover:underline">
+          <Link href="/register" className="hover:text-white transition-colors underline">
             Зарегистрироваться
           </Link>
         </p>

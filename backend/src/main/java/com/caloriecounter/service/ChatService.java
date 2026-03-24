@@ -249,8 +249,21 @@ public class ChatService {
                     ```
                     Не добавляй привычку если пользователь просто перечисляет еду без указания на привычку.
 
+                    ### Настроение
+                    Если пользователь сообщает своё настроение (например "настроение отличное", "чувствую себя хорошо", "устал"), добавь в JSON-блок:
+                    {"action":"set_mood","mood":"краткое описание настроения"}
+                    Пример: "настроение супер" → {"action":"set_mood","mood":"Отличное"}
+                    Настроение записывается один раз в день.
+
                     Будь кратким. Не добавляй лишних рассуждений.
                     """);
+
+            // Проверяем, нужно ли спросить настроение (раз в день, при первой записи)
+            boolean moodRecorded = mealEntryRepository.findFirstByUserIdAndMealDateAndMoodIsNotNull(userId, LocalDate.now()).isPresent();
+            boolean hasEntriesToday = !mealEntryRepository.findByUserIdAndMealDateAndEntryType(userId, LocalDate.now(), MealEntry.EntryType.MEAL).isEmpty();
+            if (!moodRecorded && !hasEntriesToday) {
+                prompt.append("\nВАЖНО: Это первая запись еды пользователя за сегодня. После обработки еды, спроси какое у него настроение сегодня (коротко, одним предложением). Например: \"Кстати, как настроение сегодня?\" Не спрашивай если пользователь уже указал настроение в сообщении.\n");
+            }
 
             // Добавляем данные из USDA если нашлись
             if (foodData != null) {
@@ -297,7 +310,24 @@ public class ChatService {
             for (Map<String, Object> item : items) {
                 String action = (String) item.get("action");
 
-                if ("add_habit".equals(action)) {
+                if ("set_mood".equals(action)) {
+                    String moodText = (String) item.get("mood");
+                    if (moodText != null && !moodText.isBlank()) {
+                        // Записываем настроение на первую запись дня (если ещё не записано)
+                        var existingMood = mealEntryRepository.findFirstByUserIdAndMealDateAndMoodIsNotNull(user.getId(), LocalDate.now());
+                        if (existingMood.isEmpty()) {
+                            // Найдём первую MEAL-запись за сегодня и установим mood
+                            var todayEntries = mealEntryRepository.findByUserIdAndMealDateAndEntryType(user.getId(), LocalDate.now(), MealEntry.EntryType.MEAL);
+                            if (!todayEntries.isEmpty()) {
+                                var firstEntry = todayEntries.get(0);
+                                firstEntry.setMood(moodText);
+                                mealEntryRepository.save(firstEntry);
+                            }
+                            habitNames.add("Настроение: " + moodText);
+                            log.info("Записано настроение '{}' для {}", moodText, user.getUsername());
+                        }
+                    }
+                } else if ("add_habit".equals(action)) {
                     String habitText = (String) item.get("text");
                     if (habitText != null && !habitText.isBlank()) {
                         userHabitService.addHabitFromAi(user.getId(), habitText);

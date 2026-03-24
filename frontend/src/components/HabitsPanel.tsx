@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { getHabits, addHabit, deleteHabit } from "@/lib/api";
+import { X, Plus, Bot, UserRound } from "lucide-react";
 
 interface Habit {
   id: number;
@@ -16,10 +17,23 @@ interface HabitsPanelProps {
   refreshTrigger?: number;
 }
 
+function formatDate(dateStr: string): string {
+  try {
+    const d = new Date(dateStr);
+    const day = String(d.getDate()).padStart(2, "0");
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const year = d.getFullYear();
+    return `${day}-${month}-${year}`;
+  } catch {
+    return "";
+  }
+}
+
 export default function HabitsPanel({ isOpen, onClose, refreshTrigger }: HabitsPanelProps) {
   const [habits, setHabits] = useState<Habit[]>([]);
   const [newHabit, setNewHabit] = useState("");
   const [loading, setLoading] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isOpen) loadHabits();
@@ -43,6 +57,8 @@ export default function HabitsPanel({ isOpen, onClose, refreshTrigger }: HabitsP
       await addHabit(newHabit.trim());
       setNewHabit("");
       await loadHabits();
+      // Возвращаем фокус на input
+      setTimeout(() => inputRef.current?.focus(), 50);
     } catch {
       // ошибка
     } finally {
@@ -62,45 +78,65 @@ export default function HabitsPanel({ isOpen, onClose, refreshTrigger }: HabitsP
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end">
-      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <div className="relative w-full max-w-md bg-gray-50 h-full overflow-y-auto shadow-2xl animate-slide-in flex flex-col">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+      <div
+        className="relative w-full max-w-md mx-4 max-h-[80vh] flex flex-col animate-fade-in rounded-2xl overflow-hidden"
+        style={{
+          background: "#072a38",
+          border: "1px solid rgba(23,155,176,0.3)",
+          boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+        }}
+      >
         {/* Шапка */}
-        <div className="sticky top-0 bg-white border-b z-10">
-          <div className="px-4 py-3 flex items-center justify-between">
-            <button onClick={onClose} className="text-gray-500 hover:text-gray-700 text-xl">&times;</button>
-            <span className="font-medium text-sm">Мои привычки</span>
-            <div className="w-6" />
-          </div>
+        <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
+          <span className="font-medium text-white">Мои привычки</span>
+          <button onClick={onClose} className="hover:opacity-70 transition-opacity" style={{ color: "#86CDD9" }}>
+            <X size={18} />
+          </button>
         </div>
 
         {/* Список привычек */}
-        <div className="flex-1 p-4 space-y-2">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 space-y-2">
           {habits.length === 0 ? (
-            <div className="text-center text-gray-400 mt-10 text-sm">
-              <p>Привычек пока нет</p>
+            <div className="text-center mt-8" style={{ color: "rgba(134,205,217,0.5)" }}>
+              <p className="text-sm">Привычек пока нет</p>
               <p className="mt-1 text-xs">Добавьте вручную или ИИ запомнит из контекста</p>
             </div>
           ) : (
             habits.map((habit) => (
               <div
                 key={habit.id}
-                className="bg-white rounded-2xl shadow-sm p-3 flex items-start gap-3"
+                className="p-3 flex items-start gap-3 rounded-xl"
+                style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.15)" }}
               >
                 <div
-                  className="mt-0.5 w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-white text-xs font-bold"
-                  style={{ background: habit.source === "AI" ? "linear-gradient(135deg, #179BB0, #15565B)" : "#6B7280" }}
+                  className="mt-0.5 w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0"
+                  style={{ background: habit.source === "AI" ? "linear-gradient(135deg, #179BB0, #16A085)" : "rgba(255,255,255,0.15)" }}
                   title={habit.source === "AI" ? "Запомнено ИИ" : "Добавлено вручную"}
                 >
-                  {habit.source === "AI" ? "A" : "U"}
+                  {habit.source === "AI" ? <Bot size={13} color="#fff" /> : <UserRound size={13} color="#86CDD9" />}
                 </div>
-                <p className="flex-1 text-sm text-gray-800">{habit.habitText}</p>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-white/90" style={{ overflowWrap: "break-word", wordBreak: "break-word" }}>
+                    {habit.habitText}
+                  </p>
+                  <p className="text-xs mt-1" style={{ color: "rgba(134,205,217,0.4)" }}>
+                    {formatDate(habit.createdAt)}
+                  </p>
+                </div>
                 <button
-                  onClick={() => handleDelete(habit.id)}
-                  className="text-gray-300 hover:text-red-500 transition-colors text-lg leading-none flex-shrink-0"
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleDelete(habit.id);
+                  }}
+                  className="flex-shrink-0 p-1 rounded-md hover:bg-red-500/20 transition-colors"
+                  style={{ color: "rgba(255,255,255,0.3)" }}
                   title="Удалить"
                 >
-                  &times;
+                  <X size={16} />
                 </button>
               </div>
             ))
@@ -108,23 +144,23 @@ export default function HabitsPanel({ isOpen, onClose, refreshTrigger }: HabitsP
         </div>
 
         {/* Форма добавления */}
-        <form onSubmit={handleAdd} className="sticky bottom-0 bg-white border-t p-4">
+        <form onSubmit={handleAdd} className="p-4" style={{ borderTop: "1px solid rgba(255,255,255,0.1)" }}>
           <div className="flex gap-2">
             <input
+              ref={inputRef}
               type="text"
               value={newHabit}
               onChange={(e) => setNewHabit(e.target.value)}
               placeholder="Например: чай = чай + 2 ложки сахара"
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="input-dark flex-1 text-sm min-w-0"
               disabled={loading}
             />
             <button
               type="submit"
               disabled={loading || !newHabit.trim()}
-              className="px-4 py-2 text-white rounded-xl text-sm font-medium disabled:opacity-50 transition-colors"
-              style={{ background: "linear-gradient(135deg, #179BB0, #15565B)" }}
+              className="btn-primary flex items-center gap-1 px-4 text-sm flex-shrink-0"
             >
-              Добавить
+              <Plus size={16} />
             </button>
           </div>
         </form>

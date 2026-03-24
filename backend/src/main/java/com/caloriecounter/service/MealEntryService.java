@@ -4,6 +4,7 @@ import com.caloriecounter.dto.*;
 import com.caloriecounter.dto.WeeklySummaryResponse.DaySummaryRow;
 import com.caloriecounter.dto.MonthlySummaryResponse.WeekSummaryRow;
 import com.caloriecounter.entity.MealEntry;
+import com.caloriecounter.entity.MealEntry.EntryType;
 import com.caloriecounter.entity.User;
 import com.caloriecounter.repository.MealEntryRepository;
 import com.caloriecounter.repository.UserProfileRepository;
@@ -59,7 +60,7 @@ public class MealEntryService {
                 .orElseThrow(() -> new RuntimeException("Пользователь не найден"));
 
         List<MealEntry> entries = mealEntryRepository
-                .findByUserIdAndMealDateOrderByCreatedAtAsc(user.getId(), date);
+                .findByUserIdAndMealDateAndEntryTypeOrderByCreatedAtAsc(user.getId(), date, EntryType.MEAL);
 
         List<MealEntryResponse> entryResponses = entries.stream()
                 .map(MealEntryResponse::from)
@@ -90,7 +91,7 @@ public class MealEntryService {
         LocalDate weekEnd = anyDayInWeek.with(DayOfWeek.SUNDAY);
 
         List<MealEntry> entries = mealEntryRepository
-                .findByUserIdAndMealDateBetweenOrderByMealDateAscCreatedAtAsc(user.getId(), weekStart, weekEnd);
+                .findByUserIdAndEntryTypeAndMealDateBetweenOrderByMealDateAscCreatedAtAsc(user.getId(), EntryType.MEAL, weekStart, weekEnd);
 
         // Группировка по дням
         Map<LocalDate, List<MealEntry>> byDate = entries.stream()
@@ -131,7 +132,7 @@ public class MealEntryService {
         LocalDate monthEnd = monthStart.with(TemporalAdjusters.lastDayOfMonth());
 
         List<MealEntry> entries = mealEntryRepository
-                .findByUserIdAndMealDateBetweenOrderByMealDateAscCreatedAtAsc(user.getId(), monthStart, monthEnd);
+                .findByUserIdAndEntryTypeAndMealDateBetweenOrderByMealDateAscCreatedAtAsc(user.getId(), EntryType.MEAL, monthStart, monthEnd);
 
         // Группировка по неделям
         Map<LocalDate, List<MealEntry>> byDate = entries.stream()
@@ -199,7 +200,7 @@ public class MealEntryService {
 
         for (LocalDate d = weekStart; !d.isAfter(today); d = d.plusDays(1)) {
             List<MealEntry> entries = mealEntryRepository
-                    .findByUserIdAndMealDateOrderByCreatedAtAsc(user.getId(), d);
+                    .findByUserIdAndMealDateAndEntryTypeOrderByCreatedAtAsc(user.getId(), d, EntryType.MEAL);
 
             List<MealEntryResponse> entryResponses = entries.stream()
                     .map(MealEntryResponse::from)
