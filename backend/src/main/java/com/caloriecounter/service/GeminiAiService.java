@@ -1,7 +1,6 @@
 package com.caloriecounter.service;
 
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -18,7 +17,6 @@ import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Service
-@ConditionalOnProperty(name = "app.ai.provider", havingValue = "gemini")
 public class GeminiAiService implements AiService {
 
     private final WebClient webClient;
