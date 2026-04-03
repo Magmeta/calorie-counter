@@ -7,6 +7,7 @@ import { apiRequest, isAuthenticated, logout, sendPhoto } from "@/lib/api";
 import DailyTable from "@/components/DailyTable";
 import HabitsPanel from "@/components/HabitsPanel";
 import WaterModal from "@/components/WaterModal";
+import MoodModal from "@/components/MoodModal";
 import ReactMarkdown from "react-markdown";
 import {
   Send,
@@ -59,7 +60,9 @@ export default function Home() {
   const [habitsOpen, setHabitsOpen] = useState(false);
   const [waterPopupOpen, setWaterPopupOpen] = useState(false);
   const [tableRefresh, setTableRefresh] = useState(0);
+  const [waterRefresh, setWaterRefresh] = useState(0);
   const [habitsRefresh, setHabitsRefresh] = useState(0);
+  const [moodModalOpen, setMoodModalOpen] = useState(false);
   // Мобильный overlay для таблиц
   const [mobileTableOpen, setMobileTableOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -162,6 +165,9 @@ export default function Home() {
       }
       if (data.notification && data.notification.includes("привычку")) {
         setHabitsRefresh((prev) => prev + 1);
+      }
+      if (data.askMood) {
+        setMoodModalOpen(true);
       }
     } catch {
       setMessages((prev) => [
@@ -438,20 +444,13 @@ export default function Home() {
 
             {sidebarOpen && (
               <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                {/* Кнопка + ВОДА */}
+                {/* Water Popup */}
                 <div className="relative">
-                  <button
-                    onClick={() => setWaterPopupOpen(!waterPopupOpen)}
-                    className="btn-primary w-full flex items-center justify-center gap-2 py-3 text-base font-semibold"
-                  >
-                    <Droplets size={20} />
-                    + ВОДА
-                  </button>
-                  {/* Water Popup */}
                   {waterPopupOpen && (
                     <WaterModal
                       isOpen={true}
                       onClose={() => setWaterPopupOpen(false)}
+                      onWaterAdded={() => setWaterRefresh(prev => prev + 1)}
                       mode="popup"
                     />
                   )}
@@ -462,6 +461,8 @@ export default function Home() {
                   isOpen={true}
                   onClose={() => {}}
                   refreshTrigger={tableRefresh}
+                  waterRefreshTrigger={waterRefresh}
+                  onWaterClick={() => setWaterPopupOpen(!waterPopupOpen)}
                   mode="inline"
                 />
               </div>
@@ -485,13 +486,16 @@ export default function Home() {
 
       {/* ===== Мобильный overlay для таблиц ===== */}
       {isMobile && (
-        <DailyTable isOpen={mobileTableOpen} onClose={() => setMobileTableOpen(false)} refreshTrigger={tableRefresh} mode="overlay" />
+        <DailyTable isOpen={mobileTableOpen} onClose={() => setMobileTableOpen(false)} refreshTrigger={tableRefresh} waterRefreshTrigger={waterRefresh} onWaterClick={() => setWaterPopupOpen(true)} mode="overlay" />
       )}
 
       {/* Мобильная модалка воды */}
       {isMobile && (
-        <WaterModal isOpen={waterPopupOpen} onClose={() => setWaterPopupOpen(false)} mode="modal" />
+        <WaterModal isOpen={waterPopupOpen} onClose={() => setWaterPopupOpen(false)} onWaterAdded={() => setWaterRefresh(prev => prev + 1)} mode="modal" />
       )}
+
+      {/* Модалка настроения */}
+      <MoodModal isOpen={moodModalOpen} onClose={() => setMoodModalOpen(false)} />
 
       {/* Модалка привычек */}
       <HabitsPanel isOpen={habitsOpen} onClose={() => setHabitsOpen(false)} refreshTrigger={habitsRefresh} />

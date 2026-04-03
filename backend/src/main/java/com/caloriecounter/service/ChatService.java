@@ -62,8 +62,9 @@ public class ChatService {
             }
         }
 
-        // Формируем системный промпт
-        String systemPrompt = promptBuilder.buildSystemPrompt(user.getId(), chatMode, foodData);
+        // Формируем системный промпт с текущим временем
+        String currentTime = java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"));
+        String systemPrompt = promptBuilder.buildSystemPrompt(user.getId(), chatMode, foodData, currentTime);
 
         // Берём последние сообщения для контекста
         List<Map<String, String>> conversationHistory = getConversationHistory(user.getId());
@@ -74,10 +75,12 @@ public class ChatService {
         // В режиме дневника парсим и сохраняем в таблицу
         String displayReply = aiReply;
         String notification = null;
+        boolean askMood = false;
         if (chatMode == ChatMode.DIARY) {
             ParseResult result = parseMealDataAndSave(aiReply, user);
             displayReply = result.displayText;
             notification = result.notification;
+            askMood = result.askMood;
         }
 
         // Сохраняем ответ ИИ (без JSON-блока)
@@ -88,7 +91,7 @@ public class ChatService {
         assistantMessage.setChatMode(chatMode);
         messageRepository.save(assistantMessage);
 
-        return new ChatResponse(displayReply, chatMode.name(), notification);
+        return new ChatResponse(displayReply, chatMode.name(), notification, askMood);
     }
 
     public ChatResponse sendMessageWithPhoto(String username, String message, String chatModeStr,
@@ -106,8 +109,9 @@ public class ChatService {
         userMessage.setChatMode(chatMode);
         messageRepository.save(userMessage);
 
-        // Формируем системный промпт
-        String systemPrompt = promptBuilder.buildSystemPrompt(user.getId(), chatMode, null);
+        // Формируем системный промпт с текущим временем
+        String currentTime = java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"));
+        String systemPrompt = promptBuilder.buildSystemPrompt(user.getId(), chatMode, null, currentTime);
 
         // Берём историю
         List<Map<String, String>> conversationHistory = getConversationHistory(user.getId());
@@ -118,10 +122,12 @@ public class ChatService {
         // В режиме дневника парсим и сохраняем в таблицу
         String displayReply = aiReply;
         String notification = null;
+        boolean askMood = false;
         if (chatMode == ChatMode.DIARY) {
             ParseResult result = parseMealDataAndSave(aiReply, user);
             displayReply = result.displayText;
             notification = result.notification;
+            askMood = result.askMood;
         }
 
         // Сохраняем ответ ИИ (без JSON-блока)
@@ -132,7 +138,7 @@ public class ChatService {
         assistantMessage.setChatMode(chatMode);
         messageRepository.save(assistantMessage);
 
-        return new ChatResponse(displayReply, chatMode.name(), notification);
+        return new ChatResponse(displayReply, chatMode.name(), notification, askMood);
     }
 
     public List<MessageResponse> getHistory(String username) {
@@ -147,13 +153,13 @@ public class ChatService {
 
     private static final Pattern JSON_BLOCK_PATTERN = Pattern.compile("```json\\s*(\\[.*?])\\s*```", Pattern.DOTALL);
 
-    private record ParseResult(String displayText, String notification) {}
+    private record ParseResult(String displayText, String notification, boolean askMood) {}
 
     private ParseResult parseMealDataAndSave(String aiReply, User user) {
         Matcher matcher = JSON_BLOCK_PATTERN.matcher(aiReply);
         if (!matcher.find()) {
             log.debug("JSON-блок не найден в ответе ИИ");
-            return new ParseResult(aiReply, null);
+            return new ParseResult(aiReply, null, false);
         }
 
         String jsonStr = matcher.group(1);
@@ -168,24 +174,7 @@ public class ChatService {
             for (Map<String, Object> item : items) {
                 String action = (String) item.get("action");
 
-                if ("set_mood".equals(action)) {
-                    String moodText = (String) item.get("mood");
-                    if (moodText != null && !moodText.isBlank()) {
-                        // Записываем настроение на первую запись дня (если ещё не записано)
-                        var existingMood = mealEntryRepository.findFirstByUserIdAndMealDateAndMoodIsNotNull(user.getId(), LocalDate.now());
-                        if (existingMood.isEmpty()) {
-                            // Найдём первую MEAL-запись за сегодня и установим mood
-                            var todayEntries = mealEntryRepository.findByUserIdAndMealDateAndEntryType(user.getId(), LocalDate.now(), MealEntry.EntryType.MEAL);
-                            if (!todayEntries.isEmpty()) {
-                                var firstEntry = todayEntries.get(0);
-                                firstEntry.setMood(moodText);
-                                mealEntryRepository.save(firstEntry);
-                            }
-                            habitNames.add("Настроение: " + moodText);
-                            log.info("Записано настроение '{}' для {}", moodText, user.getUsername());
-                        }
-                    }
-                } else if ("add_habit".equals(action)) {
+                if ("add_habit".equals(action)) {
                     String habitText = (String) item.get("text");
                     if (habitText != null && !habitText.isBlank()) {
                         userHabitService.addHabitFromAi(user.getId(), habitText);
@@ -227,7 +216,7 @@ public class ChatService {
             log.info("Обработано {} команд для {}", items.size(), user.getUsername());
         } catch (Exception e) {
             log.warn("Не удалось распарсить JSON из ответа ИИ: {}", e.getMessage());
-            return new ParseResult(aiReply, null);
+            return new ParseResult(aiReply, null, false);
         }
 
         // Формируем уведомление
@@ -246,9 +235,22 @@ public class ChatService {
         }
         String notification = notifications.isEmpty() ? null : String.join("\n", notifications);
 
+        // Проверяем, нужно ли спросить настроение (первая запись еды за день)
+        boolean askMood = false;
+        if (!savedNames.isEmpty()) {
+            var existingMood = mealEntryRepository.findFirstByUserIdAndMealDateAndMoodIsNotNull(user.getId(), LocalDate.now());
+            if (existingMood.isEmpty()) {
+                var todayMeals = mealEntryRepository.findByUserIdAndMealDateAndEntryType(user.getId(), LocalDate.now(), MealEntry.EntryType.MEAL);
+                // Если все записи за сегодня — те, что мы только что сохранили, значит это первая запись дня
+                if (todayMeals.size() <= savedNames.size()) {
+                    askMood = true;
+                }
+            }
+        }
+
         // Убираем JSON-блок из отображаемого ответа
         String displayText = matcher.replaceAll("").trim();
-        return new ParseResult(displayText, notification);
+        return new ParseResult(displayText, notification, askMood);
     }
 
     private Double toDouble(Object value) {

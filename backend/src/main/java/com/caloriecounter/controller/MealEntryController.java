@@ -2,7 +2,9 @@ package com.caloriecounter.controller;
 
 import com.caloriecounter.dto.DailySummaryResponse;
 import com.caloriecounter.dto.MonthlySummaryResponse;
+import com.caloriecounter.dto.MoodRequest;
 import com.caloriecounter.dto.WeeklySummaryResponse;
+import com.caloriecounter.entity.MealEntry;
 import com.caloriecounter.repository.MealEntryRepository;
 import com.caloriecounter.repository.UserRepository;
 import com.caloriecounter.service.MealEntryService;
@@ -91,7 +93,33 @@ public class MealEntryController {
         var user = userRepository.findByUsername(userDetails.getUsername())
                 .orElseThrow(() -> new RuntimeException("Пользователь не найден"));
         var entry = mealEntryRepository.findFirstByUserIdAndMealDateAndMoodIsNotNull(user.getId(), date);
-        return ResponseEntity.ok(entry.map(e -> java.util.Map.of("mood", e.getMood(), "date", e.getMealDate().toString()))
+        return ResponseEntity.ok(entry.map(e -> java.util.Map.of("mood", e.getMood().name(), "date", e.getMealDate().toString()))
                 .orElse(java.util.Map.of()));
+    }
+
+    @PostMapping("/mood")
+    public ResponseEntity<?> setMood(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestBody MoodRequest request) {
+        var user = userRepository.findByUsername(userDetails.getUsername())
+                .orElseThrow(() -> new RuntimeException("Пользователь не найден"));
+
+        // Проверяем, не записано ли уже настроение за сегодня
+        var existingMood = mealEntryRepository.findFirstByUserIdAndMealDateAndMoodIsNotNull(user.getId(), LocalDate.now());
+        if (existingMood.isPresent()) {
+            return ResponseEntity.ok(java.util.Map.of("status", "already_set"));
+        }
+
+        // Находим первую MEAL-запись за сегодня и устанавливаем mood
+        var todayMeals = mealEntryRepository.findByUserIdAndMealDateAndEntryType(user.getId(), LocalDate.now(), MealEntry.EntryType.MEAL);
+        if (todayMeals.isEmpty()) {
+            return ResponseEntity.badRequest().body(java.util.Map.of("error", "Нет записей еды за сегодня"));
+        }
+
+        var firstEntry = todayMeals.get(0);
+        firstEntry.setMood(request.getMood());
+        mealEntryRepository.save(firstEntry);
+
+        return ResponseEntity.ok(java.util.Map.of("status", "ok", "mood", request.getMood().name()));
     }
 }

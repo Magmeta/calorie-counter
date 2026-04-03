@@ -79,10 +79,12 @@ interface DailyTableProps {
   isOpen: boolean;
   onClose: () => void;
   refreshTrigger: number;
+  waterRefreshTrigger?: number;
+  onWaterClick?: () => void;
   mode?: "inline" | "overlay";
 }
 
-export default function DailyTable({ isOpen, onClose, refreshTrigger, mode = "overlay" }: DailyTableProps) {
+export default function DailyTable({ isOpen, onClose, refreshTrigger, waterRefreshTrigger = 0, onWaterClick, mode = "overlay" }: DailyTableProps) {
   const [viewMode, setViewMode] = useState<ViewMode>("daily");
   const [weekDays, setWeekDays] = useState<DailySummary[]>([]);
   const [completedWeeks, setCompletedWeeks] = useState<WeeklySummary[]>([]);
@@ -158,7 +160,7 @@ export default function DailyTable({ isOpen, onClose, refreshTrigger, mode = "ov
           <div className="text-center py-10" style={{ color: "rgba(134,205,217,0.4)" }}>Загрузка...</div>
         ) : (
           <div className="space-y-3">
-            {viewMode === "daily" && <DaysListView days={weekDays} config={columnConfig} />}
+            {viewMode === "daily" && <DaysListView days={weekDays} config={columnConfig} waterRefreshTrigger={waterRefreshTrigger} onWaterClick={onWaterClick} />}
             {viewMode === "weekly" && <WeeksListView weeks={completedWeeks} config={columnConfig} />}
             {viewMode === "monthly" && <MonthsListView months={completedMonths} config={columnConfig} />}
           </div>
@@ -205,7 +207,7 @@ export default function DailyTable({ isOpen, onClose, refreshTrigger, mode = "ov
           <div className="text-center mt-20" style={{ color: "rgba(134,205,217,0.4)" }}>Загрузка...</div>
         ) : (
           <div className="p-4 space-y-3">
-            {viewMode === "daily" && <DaysListView days={weekDays} config={columnConfig} />}
+            {viewMode === "daily" && <DaysListView days={weekDays} config={columnConfig} waterRefreshTrigger={waterRefreshTrigger} onWaterClick={onWaterClick} />}
             {viewMode === "weekly" && <WeeksListView weeks={completedWeeks} config={columnConfig} />}
             {viewMode === "monthly" && <MonthsListView months={completedMonths} config={columnConfig} />}
           </div>
@@ -219,14 +221,14 @@ export default function DailyTable({ isOpen, onClose, refreshTrigger, mode = "ov
 
 /* ===== Эмодзи настроения ===== */
 function getMoodEmoji(mood: string): string {
-  const lower = mood.toLowerCase();
-  if (lower.includes("отлич") || lower.includes("супер") || lower.includes("прекрас") || lower.includes("замечат")) return "😄";
-  if (lower.includes("хорош") || lower.includes("норм") || lower.includes("неплох")) return "😊";
-  if (lower.includes("устал") || lower.includes("сонн") || lower.includes("вял")) return "😴";
-  if (lower.includes("грус") || lower.includes("плох") || lower.includes("тоск")) return "😔";
-  if (lower.includes("злой") || lower.includes("раздраж") || lower.includes("бес")) return "😤";
-  if (lower.includes("стресс") || lower.includes("тревож") || lower.includes("нервн")) return "😰";
-  return "😐";
+  switch (mood) {
+    case "ANGRY": return "😡";
+    case "SAD": return "😞";
+    case "NEUTRAL": return "😐";
+    case "GOOD": return "😊";
+    case "HAPPY": return "😄";
+    default: return "😐";
+  }
 }
 
 /* ===== Утилиты для динамических колонок ===== */
@@ -253,7 +255,7 @@ function buildWeeklyColumns(config: TableColumnConfig, nameLabel: string) {
 }
 
 /* ===== Вид "Дни" ===== */
-function DaysListView({ days, config }: { days: DailySummary[]; config: TableColumnConfig }) {
+function DaysListView({ days, config, waterRefreshTrigger = 0, onWaterClick }: { days: DailySummary[]; config: TableColumnConfig; waterRefreshTrigger?: number; onWaterClick?: () => void }) {
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
   const [waterByDate, setWaterByDate] = useState<Record<string, number>>({});
   const [moodByDate, setMoodByDate] = useState<Record<string, string>>({});
@@ -283,7 +285,7 @@ function DaysListView({ days, config }: { days: DailySummary[]; config: TableCol
       loadWater();
       loadMoods();
     }
-  }, [days]);
+  }, [days, waterRefreshTrigger]);
 
   if (days.length === 0) {
     return <EmptyState text="Напиши в чат что ты ел — данные появятся здесь" />;
@@ -308,10 +310,10 @@ function DaysListView({ days, config }: { days: DailySummary[]; config: TableCol
         const normPercent = day.dailyNorm ? Math.round((day.totalCalories / day.dailyNorm) * 100) : null;
 
         return (
-          <div key={day.date} className="space-y-2">
+          <div key={day.date} className="glass overflow-hidden">
             <button
               onClick={() => setExpandedDate(isExpanded ? "__none__" : day.date)}
-              className="w-full glass glass-hover p-3 flex items-center justify-between transition-all"
+              className="w-full p-3 flex items-center justify-between transition-all hover:bg-white/5"
             >
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium text-white">{formatDayLabel(day.date)}</span>
@@ -330,36 +332,42 @@ function DaysListView({ days, config }: { days: DailySummary[]; config: TableCol
             {isExpanded && hasEntries && (() => {
               const { columns, colSpans, totalCols } = buildDailyColumns(config);
               return (
-              <div className="space-y-2 pl-1">
-                <div className="glass overflow-hidden">
-                  <TableHeader columns={columns} colSpans={colSpans} />
-                  {day.entries.map((e, i) => (
-                    <div key={e.id} className="grid gap-1 px-3 py-2.5 text-sm items-center"
-                         style={{
-                           gridTemplateColumns: `repeat(${totalCols}, minmax(0, 1fr))`,
-                           background: i % 2 === 0 ? "rgba(255,255,255,0.02)" : "rgba(255,255,255,0.05)",
-                         }}>
-                      <div style={{ gridColumn: "span 4" }} className="font-medium text-white/90 truncate" title={e.foodName}>{e.foodName}</div>
-                      {config.weight && <div style={{ gridColumn: "span 2", color: "#86CDD9" }} className="text-center text-xs">{e.weight ? `${Math.round(e.weight)}г` : "—"}</div>}
-                      {config.calories && <div style={{ gridColumn: "span 2" }} className="text-center font-semibold text-white">{Math.round(e.calories)}</div>}
-                      {config.protein && <div style={{ gridColumn: "span 1", color: "rgba(134,205,217,0.6)" }} className="text-center text-xs">{e.protein != null ? Math.round(e.protein) : "—"}</div>}
-                      {config.fat && <div style={{ gridColumn: "span 1", color: "rgba(134,205,217,0.6)" }} className="text-center text-xs">{e.fat != null ? Math.round(e.fat) : "—"}</div>}
-                      {config.carbs && <div style={{ gridColumn: "span 1", color: "rgba(134,205,217,0.6)" }} className="text-center text-xs">{e.carbs != null ? Math.round(e.carbs) : "—"}</div>}
-                      {config.mood && <div style={{ gridColumn: "span 1" }} className="text-center text-xs" title={moodByDate[day.date] || ""}>{moodByDate[day.date] ? getMoodEmoji(moodByDate[day.date]) : "—"}</div>}
-                    </div>
-                  ))}
-                  <TotalRow calories={day.totalCalories} protein={day.totalProtein} fat={day.totalFat} carbs={day.totalCarbs} label="Итого" config={config} />
-                </div>
+              <div>
+                <TableHeader columns={columns} colSpans={colSpans} />
+                {day.entries.map((e, i) => (
+                  <div key={e.id} className="grid gap-1 px-3 py-2.5 text-sm items-center"
+                       style={{
+                         gridTemplateColumns: `repeat(${totalCols}, minmax(0, 1fr))`,
+                         background: i % 2 === 0 ? "rgba(255,255,255,0.02)" : "rgba(255,255,255,0.05)",
+                       }}>
+                    <div style={{ gridColumn: "span 4" }} className="font-medium text-white/90 truncate" title={e.foodName}>{e.foodName}</div>
+                    {config.weight && <div style={{ gridColumn: "span 2", color: "#86CDD9" }} className="text-center text-xs">{e.weight ? `${Math.round(e.weight)}г` : "—"}</div>}
+                    {config.calories && <div style={{ gridColumn: "span 2" }} className="text-center font-semibold text-white">{Math.round(e.calories)}</div>}
+                    {config.protein && <div style={{ gridColumn: "span 1", color: "rgba(134,205,217,0.6)" }} className="text-center text-xs">{e.protein != null ? Math.round(e.protein) : "—"}</div>}
+                    {config.fat && <div style={{ gridColumn: "span 1", color: "rgba(134,205,217,0.6)" }} className="text-center text-xs">{e.fat != null ? Math.round(e.fat) : "—"}</div>}
+                    {config.carbs && <div style={{ gridColumn: "span 1", color: "rgba(134,205,217,0.6)" }} className="text-center text-xs">{e.carbs != null ? Math.round(e.carbs) : "—"}</div>}
+                    {config.mood && <div style={{ gridColumn: "span 1" }} className="text-center text-xs" title={moodByDate[day.date] || ""}>{moodByDate[day.date] ? getMoodEmoji(moodByDate[day.date]) : "—"}</div>}
+                  </div>
+                ))}
+                <TotalRow calories={day.totalCalories} protein={day.totalProtein} fat={day.totalFat} carbs={day.totalCarbs} label="Итог" config={config} />
                 <NormBar current={day.totalCalories} norm={day.dailyNorm} percent={normPercent} />
-                {waterByDate[day.date] > 0 && (
-                  <div className="glass p-3 flex items-center gap-2">
+                <div className="p-3 flex items-center justify-between" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+                  <div className="flex items-center gap-2">
                     <Droplets size={14} style={{ color: "#179BB0" }} />
-                    <span className="text-sm text-white font-medium">{waterByDate[day.date]} мл</span>
+                    <span className="text-sm text-white font-medium">{waterByDate[day.date] || 0} мл</span>
                     <span className="text-xs" style={{ color: "rgba(134,205,217,0.4)" }}>/ 2000 мл</span>
                   </div>
-                )}
-                <AiComment comment={day.aiComment} />
-                <MacroCard protein={day.totalProtein} fat={day.totalFat} carbs={day.totalCarbs} />
+                  {day.date === today && onWaterClick && (
+                    <button
+                      onClick={onWaterClick}
+                      className="flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-medium transition-all"
+                      style={{ background: "linear-gradient(135deg, #179BB0, #16A085)", color: "#fff" }}
+                    >
+                      <Droplets size={12} />
+                      + Вода
+                    </button>
+                  )}
+                </div>
               </div>
               );
             })()}
@@ -399,10 +407,10 @@ function WeeksListView({ weeks, config }: { weeks: WeeklySummary[]; config: Tabl
         const isExpanded = expandedWeek === week.weekStart;
 
         return (
-          <div key={week.weekStart} className="space-y-2">
+          <div key={week.weekStart} className="glass overflow-hidden">
             <button
               onClick={() => setExpandedWeek(isExpanded ? null : week.weekStart)}
-              className="w-full glass glass-hover p-3 flex items-center justify-between transition-all"
+              className="w-full p-3 flex items-center justify-between transition-all hover:bg-white/5"
             >
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium text-white">{formatWeekRange(week.weekStart, week.weekEnd)}</span>
@@ -417,29 +425,25 @@ function WeeksListView({ weeks, config }: { weeks: WeeklySummary[]; config: Tabl
             {isExpanded && (() => {
               const { columns, colSpans, totalCols } = buildWeeklyColumns(config, "День");
               return (
-              <div className="space-y-2 pl-1">
-                <div className="glass overflow-hidden">
-                  <TableHeader columns={columns} colSpans={colSpans} />
-                  {week.days.map((d, i) => (
-                    <div key={d.date} className="grid gap-1 px-3 py-2.5 text-sm items-center"
-                         style={{
-                           gridTemplateColumns: `repeat(${totalCols}, minmax(0, 1fr))`,
-                           background: i % 2 === 0 ? "rgba(255,255,255,0.02)" : "rgba(255,255,255,0.05)",
-                         }}>
-                      <div style={{ gridColumn: "span 4" }} className="font-medium text-white/90">{formatShortDate(d.date)}</div>
-                      {config.calories && <div style={{ gridColumn: "span 3" }} className="text-center font-semibold text-white">{Math.round(d.totalCalories)}</div>}
-                      {config.protein && <div style={{ gridColumn: "span 1", color: "rgba(134,205,217,0.6)" }} className="text-center text-xs">{Math.round(d.totalProtein)}</div>}
-                      {config.fat && <div style={{ gridColumn: "span 1", color: "rgba(134,205,217,0.6)" }} className="text-center text-xs">{Math.round(d.totalFat)}</div>}
-                      {config.carbs && <div style={{ gridColumn: "span 1", color: "rgba(134,205,217,0.6)" }} className="text-center text-xs">{Math.round(d.totalCarbs)}</div>}
-                    </div>
-                  ))}
-                  <TotalRow calories={week.avgCalories} protein={week.avgProtein} fat={week.avgFat} carbs={week.avgCarbs} label="Среднее" config={config} colLayout="weekly" />
-                  {week.dailyNorm && <NormRow norm={week.dailyNorm} config={config} colLayout="weekly" />}
-                </div>
-                <NormBar current={week.avgCalories} norm={week.dailyNorm} percent={week.dailyNorm ? Math.round((week.avgCalories / week.dailyNorm) * 100) : null} label="Среднее vs норма" />
-                <AiComment comment={week.aiComment} />
-                <MacroCard protein={week.avgProtein} fat={week.avgFat} carbs={week.avgCarbs} label="Среднее за день" />
-                <div className="text-xs text-center" style={{ color: "rgba(134,205,217,0.3)" }}>Дней с данными: {week.daysWithData} из 7</div>
+              <div>
+                <TableHeader columns={columns} colSpans={colSpans} />
+                {week.days.map((d, i) => (
+                  <div key={d.date} className="grid gap-1 px-3 py-2.5 text-sm items-center"
+                       style={{
+                         gridTemplateColumns: `repeat(${totalCols}, minmax(0, 1fr))`,
+                         background: i % 2 === 0 ? "rgba(255,255,255,0.02)" : "rgba(255,255,255,0.05)",
+                       }}>
+                    <div style={{ gridColumn: "span 4" }} className="font-medium text-white/90">{formatShortDate(d.date)}</div>
+                    {config.calories && <div style={{ gridColumn: "span 3" }} className="text-center font-semibold text-white">{Math.round(d.totalCalories)}</div>}
+                    {config.protein && <div style={{ gridColumn: "span 1", color: "rgba(134,205,217,0.6)" }} className="text-center text-xs">{Math.round(d.totalProtein)}</div>}
+                    {config.fat && <div style={{ gridColumn: "span 1", color: "rgba(134,205,217,0.6)" }} className="text-center text-xs">{Math.round(d.totalFat)}</div>}
+                    {config.carbs && <div style={{ gridColumn: "span 1", color: "rgba(134,205,217,0.6)" }} className="text-center text-xs">{Math.round(d.totalCarbs)}</div>}
+                  </div>
+                ))}
+                <TotalRow calories={week.avgCalories} protein={week.avgProtein} fat={week.avgFat} carbs={week.avgCarbs} label="Среднее" config={config} colLayout="weekly" />
+                {week.dailyNorm && <NormRow norm={week.dailyNorm} config={config} colLayout="weekly" />}
+                <NormBar current={week.avgCalories} norm={week.dailyNorm} percent={week.dailyNorm ? Math.round((week.avgCalories / week.dailyNorm) * 100) : null} label="Среднее за неделю" />
+                <div className="text-xs text-center py-2" style={{ color: "rgba(134,205,217,0.3)", borderTop: "1px solid rgba(255,255,255,0.08)" }}>Дней с данными: {week.daysWithData} из 7</div>
               </div>
               );
             })()}
@@ -471,10 +475,10 @@ function MonthsListView({ months, config }: { months: MonthlySummary[]; config: 
         const isExpanded = expandedMonth === key;
 
         return (
-          <div key={key} className="space-y-2">
+          <div key={key} className="glass overflow-hidden">
             <button
               onClick={() => setExpandedMonth(isExpanded ? null : key)}
-              className="w-full glass glass-hover p-3 flex items-center justify-between transition-all"
+              className="w-full p-3 flex items-center justify-between transition-all hover:bg-white/5"
             >
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium text-white">{month.monthName} {month.year}</span>
@@ -489,29 +493,25 @@ function MonthsListView({ months, config }: { months: MonthlySummary[]; config: 
             {isExpanded && (() => {
               const { columns, colSpans, totalCols } = buildWeeklyColumns(config, "Неделя");
               return (
-              <div className="space-y-2 pl-1">
-                <div className="glass overflow-hidden">
-                  <TableHeader columns={columns} colSpans={colSpans} />
-                  {month.weeks.map((w, i) => (
-                    <div key={w.weekStart} className="grid gap-1 px-3 py-2.5 text-sm items-center"
-                         style={{
-                           gridTemplateColumns: `repeat(${totalCols}, minmax(0, 1fr))`,
-                           background: i % 2 === 0 ? "rgba(255,255,255,0.02)" : "rgba(255,255,255,0.05)",
-                         }}>
-                      <div style={{ gridColumn: "span 4" }} className="font-medium text-white/90 text-xs">{formatWeekRange(w.weekStart, w.weekEnd)}</div>
-                      {config.calories && <div style={{ gridColumn: "span 3" }} className="text-center font-semibold text-white">{Math.round(w.avgCalories)}</div>}
-                      {config.protein && <div style={{ gridColumn: "span 1", color: "rgba(134,205,217,0.6)" }} className="text-center text-xs">{Math.round(w.avgProtein)}</div>}
-                      {config.fat && <div style={{ gridColumn: "span 1", color: "rgba(134,205,217,0.6)" }} className="text-center text-xs">{Math.round(w.avgFat)}</div>}
-                      {config.carbs && <div style={{ gridColumn: "span 1", color: "rgba(134,205,217,0.6)" }} className="text-center text-xs">{Math.round(w.avgCarbs)}</div>}
-                    </div>
-                  ))}
-                  <TotalRow calories={month.avgCalories} protein={month.avgProtein} fat={month.avgFat} carbs={month.avgCarbs} label="Среднее" config={config} colLayout="weekly" />
-                  {month.dailyNorm && <NormRow norm={month.dailyNorm} config={config} colLayout="weekly" />}
-                </div>
-                <NormBar current={month.avgCalories} norm={month.dailyNorm} percent={month.dailyNorm ? Math.round((month.avgCalories / month.dailyNorm) * 100) : null} label="Среднее vs норма" />
-                <AiComment comment={month.aiComment} />
-                <MacroCard protein={month.avgProtein} fat={month.avgFat} carbs={month.avgCarbs} label="Среднее за день" />
-                <div className="text-xs text-center" style={{ color: "rgba(134,205,217,0.3)" }}>Дней с данными: {month.daysWithData}</div>
+              <div>
+                <TableHeader columns={columns} colSpans={colSpans} />
+                {month.weeks.map((w, i) => (
+                  <div key={w.weekStart} className="grid gap-1 px-3 py-2.5 text-sm items-center"
+                       style={{
+                         gridTemplateColumns: `repeat(${totalCols}, minmax(0, 1fr))`,
+                         background: i % 2 === 0 ? "rgba(255,255,255,0.02)" : "rgba(255,255,255,0.05)",
+                       }}>
+                    <div style={{ gridColumn: "span 4" }} className="font-medium text-white/90 text-xs">{formatWeekRange(w.weekStart, w.weekEnd)}</div>
+                    {config.calories && <div style={{ gridColumn: "span 3" }} className="text-center font-semibold text-white">{Math.round(w.avgCalories)}</div>}
+                    {config.protein && <div style={{ gridColumn: "span 1", color: "rgba(134,205,217,0.6)" }} className="text-center text-xs">{Math.round(w.avgProtein)}</div>}
+                    {config.fat && <div style={{ gridColumn: "span 1", color: "rgba(134,205,217,0.6)" }} className="text-center text-xs">{Math.round(w.avgFat)}</div>}
+                    {config.carbs && <div style={{ gridColumn: "span 1", color: "rgba(134,205,217,0.6)" }} className="text-center text-xs">{Math.round(w.avgCarbs)}</div>}
+                  </div>
+                ))}
+                <TotalRow calories={month.avgCalories} protein={month.avgProtein} fat={month.avgFat} carbs={month.avgCarbs} label="Среднее" config={config} colLayout="weekly" />
+                {month.dailyNorm && <NormRow norm={month.dailyNorm} config={config} colLayout="weekly" />}
+                <NormBar current={month.avgCalories} norm={month.dailyNorm} percent={month.dailyNorm ? Math.round((month.avgCalories / month.dailyNorm) * 100) : null} label="Среднее за месяц" />
+                <div className="text-xs text-center py-2" style={{ color: "rgba(134,205,217,0.3)", borderTop: "1px solid rgba(255,255,255,0.08)" }}>Дней с данными: {month.daysWithData}</div>
               </div>
               );
             })()}
@@ -569,9 +569,9 @@ function NormRow({ norm, colLayout, config }: { norm: number; colLayout?: string
   if (colLayout === "weekly") {
     const { totalCols } = buildWeeklyColumns(c, "");
     return (
-      <div className="grid gap-1 px-3 py-2 text-sm items-center" style={{ background: "rgba(22,160,133,0.08)", gridTemplateColumns: `repeat(${totalCols}, minmax(0, 1fr))` }}>
-        <div style={{ gridColumn: "span 4", color: "rgba(134,205,217,0.5)" }} className="italic">Ожидаемое</div>
-        {c.calories && <div style={{ gridColumn: "span 3", color: "rgba(134,205,217,0.5)" }} className="text-center italic">{Math.round(norm)}</div>}
+      <div className="grid gap-1 px-3 py-3 text-sm font-bold" style={{ borderTop: "1px solid rgba(134,205,217,0.15)", gridTemplateColumns: `repeat(${totalCols}, minmax(0, 1fr))` }}>
+        <div style={{ gridColumn: "span 4", color: "rgba(134,205,217,0.7)" }}>Ср. Ожидаемое</div>
+        {c.calories && <div style={{ gridColumn: "span 3", color: "rgba(134,205,217,0.5)" }} className="text-center">{Math.round(norm)}</div>}
         {c.protein && <div style={{ gridColumn: "span 1", color: "rgba(134,205,217,0.3)" }} className="text-center text-xs">—</div>}
         {c.fat && <div style={{ gridColumn: "span 1", color: "rgba(134,205,217,0.3)" }} className="text-center text-xs">—</div>}
         {c.carbs && <div style={{ gridColumn: "span 1", color: "rgba(134,205,217,0.3)" }} className="text-center text-xs">—</div>}
@@ -580,10 +580,10 @@ function NormRow({ norm, colLayout, config }: { norm: number; colLayout?: string
   }
   const { totalCols } = buildDailyColumns(c);
   return (
-    <div className="grid gap-1 px-3 py-2 text-sm items-center" style={{ background: "rgba(22,160,133,0.08)", gridTemplateColumns: `repeat(${totalCols}, minmax(0, 1fr))` }}>
-      <div style={{ gridColumn: "span 4", color: "rgba(134,205,217,0.5)" }} className="italic">Ожидаемое</div>
+    <div className="grid gap-1 px-3 py-3 text-sm font-bold" style={{ borderTop: "1px solid rgba(134,205,217,0.15)", gridTemplateColumns: `repeat(${totalCols}, minmax(0, 1fr))` }}>
+      <div style={{ gridColumn: "span 4", color: "rgba(134,205,217,0.7)" }}>Ср. Ожидаемое</div>
       {c.weight && <div style={{ gridColumn: "span 2" }} />}
-      {c.calories && <div style={{ gridColumn: "span 2", color: "rgba(134,205,217,0.5)" }} className="text-center italic">{Math.round(norm)}</div>}
+      {c.calories && <div style={{ gridColumn: "span 2", color: "rgba(134,205,217,0.5)" }} className="text-center">{Math.round(norm)}</div>}
       {c.protein && <div style={{ gridColumn: "span 1", color: "rgba(134,205,217,0.3)" }} className="text-center text-xs">—</div>}
       {c.fat && <div style={{ gridColumn: "span 1", color: "rgba(134,205,217,0.3)" }} className="text-center text-xs">—</div>}
       {c.carbs && <div style={{ gridColumn: "span 1", color: "rgba(134,205,217,0.3)" }} className="text-center text-xs">—</div>}
@@ -595,7 +595,7 @@ function NormRow({ norm, colLayout, config }: { norm: number; colLayout?: string
 function NormBar({ current, norm, percent, label }: { current: number; norm: number | null; percent: number | null; label?: string }) {
   if (!norm) return null;
   return (
-    <div className="glass p-4">
+    <div className="p-4" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
       <div className="flex justify-between text-sm mb-2">
         <span style={{ color: "#86CDD9" }}>{label || "Дневная норма"}</span>
         <span className="font-semibold" style={{ color: "#179BB0" }}>{Math.round(current)} / {Math.round(norm)} ккал</span>

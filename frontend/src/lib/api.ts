@@ -98,6 +98,13 @@ export async function getDailyMood(date?: string) {
   return apiRequest(`/api/meals/mood${param}`);
 }
 
+export async function setDailyMood(mood: string) {
+  return apiRequest("/api/meals/mood", {
+    method: "POST",
+    body: JSON.stringify({ mood }),
+  });
+}
+
 export function isAuthenticated(): boolean {
   return !!localStorage.getItem("token");
 }

@@ -14,12 +14,13 @@ interface WaterEntry {
 interface WaterModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onWaterAdded?: () => void;
   mode?: "modal" | "popup";
 }
 
 const QUICK_AMOUNTS = [250, 330, 500, 1000];
 
-export default function WaterModal({ isOpen, onClose, mode = "modal" }: WaterModalProps) {
+export default function WaterModal({ isOpen, onClose, onWaterAdded, mode = "modal" }: WaterModalProps) {
   const [amount, setAmount] = useState("");
   const [selectedMl, setSelectedMl] = useState<number | null>(null);
   const [totalMl, setTotalMl] = useState(0);
@@ -48,6 +49,7 @@ export default function WaterModal({ isOpen, onClose, mode = "modal" }: WaterMod
       setAmount("");
       setSelectedMl(null);
       await loadDailyWater();
+      onWaterAdded?.();
     } catch {
       // ошибка
     } finally {

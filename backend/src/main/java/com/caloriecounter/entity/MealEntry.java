@@ -13,6 +13,8 @@ public class MealEntry {
 
     public enum EntryType { MEAL, WATER }
 
+    public enum Mood { ANGRY, SAD, NEUTRAL, GOOD, HAPPY }
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -37,7 +39,8 @@ public class MealEntry {
     private Double fat;
     private Double carbs;
 
-    private String mood; // настроение за день (заполняется на первой записи дня)
+    @Enumerated(EnumType.STRING)
+    private Mood mood; // настроение за день (заполняется на первой записи дня)
 
     @Column(nullable = false)
     private LocalDate mealDate;

@@ -64,7 +64,7 @@ export default function TableSettings({ isOpen, onClose, config, onChange }: Tab
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="glass relative p-5 w-full max-w-xs animate-fade-in">
+      <div className="relative p-5 w-full max-w-xs animate-fade-in rounded-2xl" style={{ background: "#0a3d4f", border: "1px solid rgba(23,155,176,0.3)", boxShadow: "0 8px 32px rgba(0,0,0,0.5)" }}>
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-base font-semibold text-white">Настройки таблицы</h3>
           <button onClick={onClose} className="transition-colors" style={{ color: "#86CDD9" }}>

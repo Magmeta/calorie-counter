@@ -75,6 +75,22 @@ body {
   border-color: var(--glass-border-hover);
 }
 
+/* Усиленный glass-эффект для карточек профиля */
+.glass-strong {
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+/* Disabled inputs — сохраняют читаемость */
+.input-dark:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 /* ===== Градиентная кнопка ===== */
 .btn-primary {
   background: linear-gradient(135deg, var(--accent-cyan), var(--accent-emerald));

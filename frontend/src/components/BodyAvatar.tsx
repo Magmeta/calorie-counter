@@ -1,189 +1,277 @@
 "use client";
 
+import { useState } from "react";
+
 interface BodyAvatarProps {
   gender: string;
   height: number | "";
   weight: number | "";
 }
 
-function getBodyType(weight: number, height: number): "thin" | "normal" | "overweight" | "obese" {
-  const bmi = weight / ((height / 100) ** 2);
-  if (bmi < 18.5) return "thin";
-  if (bmi < 25) return "normal";
-  if (bmi < 30) return "overweight";
-  return "obese";
-}
-
-function getHeightScale(height: number): number {
-  if (height < 155) return 0.88;
-  if (height < 165) return 0.92;
-  if (height < 175) return 0.96;
-  if (height < 185) return 1.0;
-  return 1.04;
-}
-
-function getBodyParams(bodyType: "thin" | "normal" | "overweight" | "obese") {
-  switch (bodyType) {
-    case "thin":
-      return { torsoWidth: 28, hipWidth: 24, armWidth: 7, legWidth: 9, belly: 0 };
-    case "normal":
-      return { torsoWidth: 34, hipWidth: 30, armWidth: 9, legWidth: 11, belly: 2 };
-    case "overweight":
-      return { torsoWidth: 42, hipWidth: 38, armWidth: 11, legWidth: 13, belly: 8 };
-    case "obese":
-      return { torsoWidth: 50, hipWidth: 46, armWidth: 13, legWidth: 15, belly: 14 };
-  }
-}
-
-function getBmiLabel(weight: number, height: number): { text: string; color: string } {
+function getBmiInfo(weight: number, height: number): { value: string; label: string; color: string } {
   const bmi = weight / ((height / 100) ** 2);
   const bmiStr = bmi.toFixed(1);
-  if (bmi < 18.5) return { text: `ИМТ: ${bmiStr} — Недостаточный вес`, color: "#86CDD9" };
-  if (bmi < 25) return { text: `ИМТ: ${bmiStr} — Норма`, color: "#16A085" };
-  if (bmi < 30) return { text: `ИМТ: ${bmiStr} — Избыточный вес`, color: "#f59e0b" };
-  return { text: `ИМТ: ${bmiStr} — Ожирение`, color: "#ef4444" };
+  if (bmi < 18.5) return { value: bmiStr, label: "Недостаточный вес", color: "#86CDD9" };
+  if (bmi < 25) return { value: bmiStr, label: "Норма", color: "#16A085" };
+  if (bmi < 30) return { value: bmiStr, label: "Избыточный вес", color: "#f59e0b" };
+  return { value: bmiStr, label: "Ожирение", color: "#ef4444" };
+}
+
+/* Мужской силуэт — единый замкнутый контур */
+function MaleSilhouette() {
+  return (
+    <path
+      d={`
+        M 50,8
+        C 44,8 40,14 40,20
+        C 40,26 44,31 50,32
+        L 50,32
+        C 48,33 46,34 44,35
+        L 42,36
+        C 37,38 32,42 28,48
+        C 25,53 24,58 23,64
+        L 20,80
+        C 19,84 19,87 20,89
+        L 23,89
+        C 23,86 23,84 24,80
+        L 26,66
+        C 27,60 29,55 32,50
+        L 34,48
+        L 34,68
+        L 33,90
+        L 32,110
+        C 31,120 31,130 32,140
+        L 34,158
+        L 36,180
+        L 36,196
+        C 36,199 35,201 34,203
+        L 31,208
+        L 31,213
+        L 44,213
+        L 44,209
+        L 40,204
+        L 40,196
+        L 42,170
+        L 44,150
+        L 46,130
+        L 48,118
+        L 50,118
+        L 52,130
+        L 54,150
+        L 56,170
+        L 58,196
+        L 58,204
+        L 54,209
+        L 54,213
+        L 67,213
+        L 67,208
+        L 64,203
+        C 63,201 62,199 62,196
+        L 62,180
+        L 64,158
+        C 65,140 66,130 66,110
+        L 65,90
+        L 64,68
+        L 64,48
+        L 66,50
+        C 69,55 71,60 72,66
+        L 74,80
+        C 75,84 75,86 75,89
+        L 78,89
+        C 79,87 79,84 78,80
+        L 75,64
+        C 74,58 73,53 70,48
+        C 66,42 61,38 56,36
+        L 54,35
+        C 52,34 50,33 48,32
+        L 48,32
+        C 54,31 58,26 58,20
+        C 58,14 54,8 50,8
+        Z
+      `}
+      stroke="#86CDD9"
+      strokeWidth="1.3"
+      fill="none"
+      strokeLinejoin="round"
+      strokeLinecap="round"
+    />
+  );
+}
+
+/* Женский силуэт — единый замкнутый контур */
+function FemaleSilhouette() {
+  return (
+    <>
+      {/* Голова с волосами */}
+      <path
+        d={`
+          M 50,6
+          C 43,6 39,12 39,19
+          C 39,25 42,29 46,31
+          C 44,32 42,33 40,34
+          L 37,36
+          C 36,34 34,32 33,31
+          C 31,30 30,30 30,32
+          L 31,36
+          L 34,38
+          L 37,36
+        `}
+        stroke="#86CDD9"
+        strokeWidth="1.3"
+        fill="none"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+      <path
+        d={`
+          M 50,6
+          C 57,6 61,12 61,19
+          C 61,25 58,29 54,31
+          C 56,32 58,33 60,34
+          L 63,36
+          C 64,34 66,32 67,31
+          C 69,30 70,30 70,32
+          L 69,36
+          L 66,38
+          L 63,36
+        `}
+        stroke="#86CDD9"
+        strokeWidth="1.3"
+        fill="none"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+      {/* Тело — единый контур */}
+      <path
+        d={`
+          M 37,36
+          C 32,39 28,44 26,50
+          C 24,56 23,62 22,68
+          L 20,80
+          C 19,84 19,86 20,88
+          L 23,88
+          C 23,86 23,83 24,80
+          L 26,68
+          C 27,62 29,56 31,52
+          L 33,48
+          L 34,58
+          C 35,64 36,70 37,76
+          L 38,84
+          C 39,88 38,92 36,96
+          C 34,100 32,106 32,112
+          L 31,122
+          C 31,128 32,134 33,140
+          L 35,156
+          L 36,176
+          L 36,196
+          C 36,199 35,201 34,203
+          L 31,208
+          L 31,213
+          L 44,213
+          L 44,209
+          L 40,204
+          L 40,196
+          L 42,170
+          L 44,150
+          L 46,134
+          L 48,120
+          L 50,120
+          L 52,134
+          L 54,150
+          L 56,170
+          L 58,196
+          L 58,204
+          L 54,209
+          L 54,213
+          L 67,213
+          L 67,208
+          L 64,203
+          C 63,201 62,199 62,196
+          L 62,176
+          L 63,156
+          C 64,134 66,128 67,122
+          L 66,112
+          C 66,106 64,100 62,96
+          C 60,92 59,88 60,84
+          L 61,76
+          C 62,70 63,64 64,58
+          L 65,48
+          L 67,52
+          C 69,56 71,62 72,68
+          L 74,80
+          C 75,83 75,86 75,88
+          L 78,88
+          C 79,86 79,84 78,80
+          L 76,68
+          C 75,62 74,56 72,50
+          C 70,44 66,39 63,36
+        `}
+        stroke="#86CDD9"
+        strokeWidth="1.3"
+        fill="none"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+    </>
+  );
 }
 
 export default function BodyAvatar({ gender, height, weight }: BodyAvatarProps) {
+  const [hovered, setHovered] = useState(false);
+
   if (!gender || !height || !weight) {
     return (
       <div className="flex flex-col items-center justify-center py-6 text-sm" style={{ color: "rgba(134,205,217,0.5)" }}>
-        <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
-          <circle cx="40" cy="25" r="12" stroke="rgba(134,205,217,0.3)" strokeWidth="2" fill="none" />
-          <line x1="40" y1="37" x2="40" y2="60" stroke="rgba(134,205,217,0.3)" strokeWidth="2" />
-          <line x1="25" y1="45" x2="55" y2="45" stroke="rgba(134,205,217,0.3)" strokeWidth="2" />
-          <line x1="40" y1="60" x2="30" y2="78" stroke="rgba(134,205,217,0.3)" strokeWidth="2" />
-          <line x1="40" y1="60" x2="50" y2="78" stroke="rgba(134,205,217,0.3)" strokeWidth="2" />
+        <svg width="80" height="160" viewBox="0 0 100 220" fill="none">
+          <circle cx="50" cy="16" r="12" stroke="rgba(134,205,217,0.3)" strokeWidth="1.5" fill="none" />
+          <line x1="50" y1="28" x2="50" y2="120" stroke="rgba(134,205,217,0.3)" strokeWidth="1.5" />
+          <line x1="50" y1="50" x2="30" y2="90" stroke="rgba(134,205,217,0.3)" strokeWidth="1.5" />
+          <line x1="50" y1="50" x2="70" y2="90" stroke="rgba(134,205,217,0.3)" strokeWidth="1.5" />
+          <line x1="50" y1="120" x2="38" y2="195" stroke="rgba(134,205,217,0.3)" strokeWidth="1.5" />
+          <line x1="50" y1="120" x2="62" y2="195" stroke="rgba(134,205,217,0.3)" strokeWidth="1.5" />
         </svg>
         <p className="mt-2">Заполните профиль для отображения аватара</p>
       </div>
     );
   }
 
-  const bodyType = getBodyType(weight, height);
-  const heightScale = getHeightScale(height);
-  const params = getBodyParams(bodyType);
-  const bmiInfo = getBmiLabel(weight, height);
+  const bmi = getBmiInfo(weight, height);
   const isMale = gender === "MALE";
 
-  const cx = 75;
-  const headR = 14;
-  const headY = 28;
-
-  // Цвета для тёмной темы
-  const skinColor = "#FFDBB4";
-  const hairColor = isMale ? "#5C4033" : "#8B5E3C";
-  const shirtColor = isMale ? "#179BB0" : "#16A085";
-  const pantsColor = "#1a3a4a";
-
   return (
-    <div className="flex flex-col items-center py-4">
-      <svg
-        width="150"
-        height={Math.round(220 * heightScale)}
-        viewBox={`0 0 150 ${Math.round(220 * heightScale)}`}
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <g transform={`scale(1, ${heightScale})`}>
-          <circle cx={cx} cy={headY} r={headR} fill={skinColor} />
+    <div
+      className="flex flex-col items-center py-4 relative"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{ cursor: "default" }}
+    >
+      <div className="relative">
+        <svg width="100" height="180" viewBox="10 0 80 220" fill="none" xmlns="http://www.w3.org/2000/svg">
+          {isMale ? <MaleSilhouette /> : <FemaleSilhouette />}
+        </svg>
 
-          {isMale ? (
-            <path
-              d={`M${cx - 13} ${headY - 4} Q${cx} ${headY - 22} ${cx + 13} ${headY - 4}`}
-              fill={hairColor}
-            />
-          ) : (
-            <>
-              <path
-                d={`M${cx - 14} ${headY - 2} Q${cx} ${headY - 24} ${cx + 14} ${headY - 2}`}
-                fill={hairColor}
-              />
-              <ellipse cx={cx - 14} cy={headY + 8} rx={4} ry={14} fill={hairColor} />
-              <ellipse cx={cx + 14} cy={headY + 8} rx={4} ry={14} fill={hairColor} />
-            </>
-          )}
-
-          <circle cx={cx - 5} cy={headY - 1} r={1.5} fill="#374151" />
-          <circle cx={cx + 5} cy={headY - 1} r={1.5} fill="#374151" />
-
-          <path
-            d={`M${cx - 4} ${headY + 4} Q${cx} ${headY + 8} ${cx + 4} ${headY + 4}`}
-            stroke="#374151"
-            strokeWidth="1"
-            fill="none"
-          />
-
-          <rect x={cx - 4} y={headY + headR - 2} width={8} height={8} fill={skinColor} />
-
-          <path
-            d={`M${cx - params.torsoWidth / 2} ${headY + headR + 6}
-                Q${cx - params.torsoWidth / 2 - 2} ${headY + headR + 50 + params.belly}
-                 ${cx - params.hipWidth / 2} ${headY + headR + 60 + params.belly}
-                L${cx + params.hipWidth / 2} ${headY + headR + 60 + params.belly}
-                Q${cx + params.torsoWidth / 2 + 2} ${headY + headR + 50 + params.belly}
-                 ${cx + params.torsoWidth / 2} ${headY + headR + 6}
-                Z`}
-            fill={shirtColor}
-          />
-
-          {params.belly > 2 && (
-            <ellipse
-              cx={cx}
-              cy={headY + headR + 35 + params.belly / 2}
-              rx={params.torsoWidth / 2 - 4}
-              ry={params.belly + 4}
-              fill={shirtColor}
-              opacity={0.7}
-            />
-          )}
-
-          <path
-            d={`M${cx - params.torsoWidth / 2} ${headY + headR + 8}
-                L${cx - params.torsoWidth / 2 - 12} ${headY + headR + 55}
-                L${cx - params.torsoWidth / 2 - 12 + params.armWidth} ${headY + headR + 56}
-                L${cx - params.torsoWidth / 2 + params.armWidth - 2} ${headY + headR + 10}
-                Z`}
-            fill={shirtColor}
-          />
-          <path
-            d={`M${cx + params.torsoWidth / 2} ${headY + headR + 8}
-                L${cx + params.torsoWidth / 2 + 12} ${headY + headR + 55}
-                L${cx + params.torsoWidth / 2 + 12 - params.armWidth} ${headY + headR + 56}
-                L${cx + params.torsoWidth / 2 - params.armWidth + 2} ${headY + headR + 10}
-                Z`}
-            fill={shirtColor}
-          />
-
-          <circle cx={cx - params.torsoWidth / 2 - 9} cy={headY + headR + 57} r={4} fill={skinColor} />
-          <circle cx={cx + params.torsoWidth / 2 + 9} cy={headY + headR + 57} r={4} fill={skinColor} />
-
-          <path
-            d={`M${cx - params.hipWidth / 2} ${headY + headR + 59 + params.belly}
-                L${cx - params.hipWidth / 2 - 3} ${headY + headR + 120 + params.belly}
-                L${cx - params.hipWidth / 2 - 3 + params.legWidth} ${headY + headR + 120 + params.belly}
-                L${cx - 2} ${headY + headR + 59 + params.belly}
-                Z`}
-            fill={pantsColor}
-          />
-          <path
-            d={`M${cx + params.hipWidth / 2} ${headY + headR + 59 + params.belly}
-                L${cx + params.hipWidth / 2 + 3} ${headY + headR + 120 + params.belly}
-                L${cx + params.hipWidth / 2 + 3 - params.legWidth} ${headY + headR + 120 + params.belly}
-                L${cx + 2} ${headY + headR + 59 + params.belly}
-                Z`}
-            fill={pantsColor}
-          />
-
-          <ellipse cx={cx - params.hipWidth / 2 + params.legWidth / 2 - 3} cy={headY + headR + 122 + params.belly} rx={params.legWidth / 2 + 2} ry={4} fill="#0d2633" />
-          <ellipse cx={cx + params.hipWidth / 2 - params.legWidth / 2 + 3} cy={headY + headR + 122 + params.belly} rx={params.legWidth / 2 + 2} ry={4} fill="#0d2633" />
-        </g>
-      </svg>
-
-      <div className="mt-2 text-center">
-        <span className="text-sm font-medium" style={{ color: bmiInfo.color }}>
-          {bmiInfo.text}
-        </span>
+        {/* Hover — ИМТ поверх силуэта */}
+        <div
+          className="absolute inset-0 flex items-center justify-center"
+          style={{
+            opacity: hovered ? 1 : 0,
+            transition: "opacity 0.3s ease",
+            pointerEvents: "none",
+          }}
+        >
+          <div
+            className="px-4 py-2 rounded-xl text-sm font-semibold"
+            style={{
+              background: "rgba(5,53,69,0.9)",
+              backdropFilter: "blur(8px)",
+              border: `1px solid ${bmi.color}`,
+              color: bmi.color,
+              whiteSpace: "nowrap",
+            }}
+          >
+            ИМТ: {bmi.value} — {bmi.label}
+          </div>
+        </div>
       </div>
     </div>
   );

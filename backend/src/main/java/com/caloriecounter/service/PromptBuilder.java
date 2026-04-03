@@ -1,14 +1,10 @@
 package com.caloriecounter.service;
 
-import com.caloriecounter.entity.MealEntry;
 import com.caloriecounter.entity.Message.ChatMode;
 import com.caloriecounter.entity.UserProfile;
-import com.caloriecounter.repository.MealEntryRepository;
 import com.caloriecounter.repository.UserProfileRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-
-import java.time.LocalDate;
 
 @Service
 @RequiredArgsConstructor
@@ -16,9 +12,8 @@ public class PromptBuilder {
 
     private final UserProfileRepository userProfileRepository;
     private final UserHabitService userHabitService;
-    private final MealEntryRepository mealEntryRepository;
 
-    public String buildSystemPrompt(Long userId, ChatMode chatMode, String foodData) {
+    public String buildSystemPrompt(Long userId, ChatMode chatMode, String foodData, String currentTime) {
         StringBuilder prompt = new StringBuilder();
         prompt.append("Ты — ИИ-помощник в приложении для подсчёта калорий. Отвечай на русском языке.\n");
 
@@ -62,6 +57,12 @@ public class PromptBuilder {
             prompt.append("Если пользователь говорит продукт из привычки — автоматически учитывай добавки.\n");
         }
 
+        if (currentTime != null) {
+            prompt.append("\n## Текущее время\n");
+            prompt.append("Сейчас: ").append(currentTime).append("\n");
+            prompt.append("Используй время для оценки размера порции (завтрак обычно меньше обеда), если пользователь не указал явно когда ел.\n");
+        }
+
         if (chatMode == ChatMode.DIARY) {
             prompt.append("""
 
@@ -69,22 +70,21 @@ public class PromptBuilder {
                     Пользователь записывает что он ел или просит изменить/удалить записи. Твоя задача:
 
                     ### Если пользователь сообщает о еде:
-                    1. Определи все продукты/блюда из сообщения пользователя.
-                    2. Для каждого продукта укажи:
-                       - Название
-                       - Примерный вес порции (если пользователь не указал — оцени стандартную порцию)
-                       - Калории (ккал)
-                       - Белки (г), Жиры (г), Углеводы (г)
-                    3. Покажи итого по всем продуктам.
+                    1. Определи все продукты/блюда из сообщения пользователя. Понимай названия еды на любом языке (английский, русский, корейский, японский и т.д.). Записывай название на языке пользователя.
+                    2. Для каждого продукта определи калории и БЖУ.
+                    3. Если пользователь не указал вес — оцени среднюю порцию с учётом возраста пользователя (дети, подростки, взрослые, пожилые — порции различаются).
 
                     Формат ответа:
-                    🍽 [Название] — [вес]г
-                    Ккал: [число] | Б: [число]г | Ж: [число]г | У: [число]г
+                    Записал: [список продуктов через запятую] (X ккал итог)
 
-                    📊 Итого: [ккал] ккал | Б: [число]г | Ж: [число]г | У: [число]г
+                    ### Уточняющие вопросы
+                    Задавай уточняющий вопрос ТОЛЬКО если способ приготовления или вариант блюда меняет калорийность более чем на 20-30% (например: жареная vs варёная картошка, разные виды молока). Не задавай шаблонных вопросов каждый раз.
 
-                    После основного ответа добавь:
-                    "Для более точного подсчёта уточни:" и перечисли 2-3 вопроса (вес порции, способ приготовления, добавки).
+                    ### Абстрактные запросы
+                    Если запрос слишком абстрактный (например "обед в макдаке", "ужин в ресторане", "бизнес-ланч"), НЕ угадывай состав — уточни что именно было съедено. Не генерируй JSON-блок пока состав не уточнён.
+
+                    ### Интересный факт
+                    В самом конце ответа добавь 1 короткий интересный или полезный факт о случайном продукте из перечисленных. Факты должны быть разнообразными, не повторяться.
 
                     ВАЖНО: В самом конце ответа ОБЯЗАТЕЛЬНО добавь блок данных для записи в таблицу в формате:
                     ```json
@@ -113,7 +113,7 @@ public class PromptBuilder {
                     ### Привычки
                     Если пользователь упоминает привычку (например "я всегда пью чай с сахаром", "обычно ем кашу с маслом", "мой кофе = латте"), добавь в JSON-блок:
                     {"action":"add_habit","text":"описание привычки"}
-                    Пример: пользователь говорит "я всегда пью чай с двумя ложками сахара" → добавь запись еды И привычку:
+                    Пример: пользователь говорит "я всегда пью чай с двумя ложками сахара" -> добавь запись еды И привычку:
                     ```json
                     [{"name":"Чай с сахаром","weight":250,"calories":40,"protein":0,"fat":0,"carbs":10},{"action":"add_habit","text":"Чай = чай + 2 ложки сахара (+20 ккал)"}]
                     ```
@@ -124,21 +124,8 @@ public class PromptBuilder {
                     ```
                     Не добавляй привычку если пользователь просто перечисляет еду без указания на привычку.
 
-                    ### Настроение
-                    Если пользователь сообщает своё настроение (например "настроение отличное", "чувствую себя хорошо", "устал"), добавь в JSON-блок:
-                    {"action":"set_mood","mood":"краткое описание настроения"}
-                    Пример: "настроение супер" → {"action":"set_mood","mood":"Отличное"}
-                    Настроение записывается один раз в день.
-
                     Будь кратким. Не добавляй лишних рассуждений.
                     """);
-
-            // Проверяем, нужно ли спросить настроение (раз в день, при первой записи)
-            boolean moodRecorded = mealEntryRepository.findFirstByUserIdAndMealDateAndMoodIsNotNull(userId, LocalDate.now()).isPresent();
-            boolean hasEntriesToday = !mealEntryRepository.findByUserIdAndMealDateAndEntryType(userId, LocalDate.now(), MealEntry.EntryType.MEAL).isEmpty();
-            if (!moodRecorded && !hasEntriesToday) {
-                prompt.append("\nВАЖНО: Это первая запись еды пользователя за сегодня. После обработки еды, спроси какое у него настроение сегодня (коротко, одним предложением). Например: \"Кстати, как настроение сегодня?\" Не спрашивай если пользователь уже указал настроение в сообщении.\n");
-            }
 
             // Добавляем данные из USDA если нашлись
             if (foodData != null) {

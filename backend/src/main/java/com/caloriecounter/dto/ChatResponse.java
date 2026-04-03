@@ -9,10 +9,12 @@ public class ChatResponse {
     private String reply;
     private String chatMode;
     private String notification;
+    private boolean askMood;
 
     public ChatResponse(String reply, String chatMode) {
         this.reply = reply;
         this.chatMode = chatMode;
         this.notification = null;
+        this.askMood = false;
     }
 }
